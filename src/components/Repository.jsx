@@ -1,115 +1,149 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
-  Plus, Trash, Warning, Download, MagnifyingGlass, User, Eye, EyeSlash, FilePdf, FileImage, Video, Link as LinkIcon 
+  Plus, Trash, Warning, Download, MagnifyingGlass, Eye, EyeSlash, FilePdf, FileImage, Video, Link as LinkIcon, BookOpen, CheckCircle, Spinner 
 } from '@phosphor-icons/react';
-import { firestoreDb } from '../utils/db';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { DatabaseService } from '../utils/db';
 
-export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile, onToggleFileVisibility }) {
-  const [activeSubTab, setActiveSubTab] = useState('mine'); // 'mine' or 'peers'
+export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile, onToggleFileVisibility, onRefresh }) {
+  const [activeSubTab, setActiveSubTab] = useState('mine'); // 'mine' | 'global_search'
   const [activeCategory, setActiveCategory] = useState('all');
 
   // File Upload Form State
   const [title, setTitle] = useState('');
   const [courseId, setCourseId] = useState('');
   const [fileType, setFileType] = useState('pdf');
-  const [fileSize, setFileSize] = useState('2.4 MB');
+  const [selectedFile, setSelectedFile] = useState(null);
   const [isPublic, setIsPublic] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [uploading, setUploading] = useState(false);
 
-  // Peers Search State
-  const [peerSearchQuery, setPeerSearchQuery] = useState('');
-  const [peersList, setPeersList] = useState([]);
-  const [selectedPeer, setSelectedPeer] = useState(null);
-  const [peerFiles, setPeerFiles] = useState([]);
+  // Global Search State
+  const [globalSearchQuery, setGlobalSearchQuery] = useState('');
+  const [globalSearchResults, setGlobalSearchResults] = useState([]);
+  const [searched, setSearched] = useState(false);
 
-  // Fetch peers on mount / search change
-  useEffect(() => {
-    const fetchPeers = async () => {
-      try {
-        const qSnap = await getDocs(collection(firestoreDb, 'users'));
-        const list = qSnap.docs
-          .map(d => d.data())
-          .filter(u => u.email !== userEmail);
-        setPeersList(list);
-      } catch (err) {
-        console.error("Error fetching peers:", err);
-      }
-    };
-    if (activeSubTab === 'peers') {
-      fetchPeers();
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setSelectedFile(file);
+    // Auto-detect type
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
+      setFileType('image');
+    } else if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) {
+      setFileType('video');
+    } else {
+      setFileType('pdf'); // Default standard document
     }
-  }, [activeSubTab, userEmail]);
 
-  // Fetch selected peer's public resources
-  useEffect(() => {
-    const fetchPeerFiles = async () => {
-      if (!selectedPeer) return;
-      try {
-        const qSnap = await getDocs(
-          query(
-            collection(firestoreDb, 'files'), 
-            where('userId', '==', selectedPeer.email), 
-            where('isPublic', '==', true)
-          )
-        );
-        setPeerFiles(qSnap.docs.map(d => d.data()));
-      } catch (err) {
-        console.error("Error fetching peer files:", err);
-      }
-    };
-    fetchPeerFiles();
-  }, [selectedPeer]);
+    if (!title.trim()) {
+      // Auto-fill title with filename without extension
+      const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+      setTitle(nameWithoutExt);
+    }
+  };
 
-  const handleUploadSubmit = (e) => {
+  const handleUploadSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
+    if (!selectedFile) {
+      setError('Please select an actual file to upload.');
+      return;
+    }
     if (!title.trim()) {
       setError('Please enter a resource title.');
       return;
     }
 
-    onAddFile({
-      title: title.trim(),
-      courseId: courseId || 'none',
-      fileType,
-      size: fileSize.trim(),
-      isPublic
-    });
+    setUploading(true);
+    try {
+      // 1. Upload actual file to Supabase Storage
+      const { publicUrl, size } = await DatabaseService.uploadFileToStorage(selectedFile);
+      
+      // Calculate human-readable size
+      const sizeStr = (size < 1024 * 1024) 
+        ? (size / 1024).toFixed(1) + ' KB' 
+        : (size / (1024 * 1024)).toFixed(1) + ' MB';
 
-    setSuccess('Resource metadata uploaded successfully!');
-    setTitle('');
-    setCourseId('');
-    setTimeout(() => setSuccess(''), 3000);
+      // 2. Save metadata reference in files table
+      await onAddFile({
+        title: title.trim(),
+        courseId: courseId || 'none',
+        fileType,
+        size: sizeStr,
+        isPublic,
+        url: publicUrl
+      });
+
+      setSuccess('Resource uploaded successfully to Supabase Storage!');
+      setTitle('');
+      setCourseId('');
+      setSelectedFile(null);
+      
+      // Reset file input
+      const fileInput = document.getElementById('actual-file-picker');
+      if (fileInput) fileInput.value = '';
+
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error(err);
+      setError('Upload failed. Please check your network and storage configurations.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleGlobalSearch = async (e) => {
+    e.preventDefault();
+    if (!globalSearchQuery.trim()) return;
+
+    try {
+      const results = await DatabaseService.searchGlobalPublicFiles(globalSearchQuery.trim());
+      setGlobalSearchResults(results);
+      setSearched(true);
+    } catch (err) {
+      console.error("Global search error:", err);
+    }
+  };
+
+  const handleCopyResource = async (file) => {
+    try {
+      await DatabaseService.addPublicFileToMine(file, userEmail);
+      setSuccess(`"${file.title}" has been added to your My Resources folder!`);
+      onRefresh();
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError('Error copying resource to your list.');
+      setTimeout(() => setError(''), 3000);
+    }
   };
 
   const handleDownload = (file) => {
-    // Generate custom text blob content simulating actual files
-    const fileContent = `Estudy Academic Companion\n` +
-      `File Name: ${file.title}\n` +
-      `File Size: ${file.size}\n` +
-      `File Type: ${file.fileType.toUpperCase()}\n` +
-      `Uploaded By: ${file.userId}\n` +
-      `This mock download represents the real study resource compiled on Estudy.\n`;
-
-    const blob = new Blob([fileContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${file.title.replace(/\s+/g, '_')}.${file.fileType === 'link' ? 'url' : 'txt'}`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    if (file.url) {
+      // Open file in new tab or download from Supabase storage URL
+      window.open(file.url, '_blank');
+    } else {
+      // Fallback mock download
+      const fileContent = `Estudy Resource Reference\nTitle: ${file.title}\nSize: ${file.size}\n`;
+      const blob = new Blob([fileContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${file.title}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   };
 
-  // Filter user's own files
-  const myFiles = files.filter(f => f.userId === userEmail);
-  const filteredMyFiles = myFiles.filter(f => {
+  // Filter user's files
+  const filteredMyFiles = files.filter(f => {
     if (activeCategory === 'all') return true;
     return f.fileType === activeCategory;
   });
@@ -124,55 +158,61 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
     }
   };
 
-  const filteredPeers = peersList.filter(p => 
-    p.name.toLowerCase().includes(peerSearchQuery.toLowerCase()) ||
-    p.email.toLowerCase().includes(peerSearchQuery.toLowerCase())
-  );
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
-      {/* Tab Switcher */}
-      <div className="timetable-toggle-container">
+      {/* Sub Tab Switcher */}
+      <div className="timetable-toggle-container" style={{ marginBottom: '24px' }}>
         <div className="timetable-toggle-bar">
           <button 
             className={`timetable-toggle-btn ${activeSubTab === 'mine' ? 'active' : ''}`}
-            onClick={() => { setActiveSubTab('mine'); setSelectedPeer(null); }}
+            onClick={() => setActiveSubTab('mine')}
           >
             My Resources
           </button>
           <button 
-            className={`timetable-toggle-btn ${activeSubTab === 'peers' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('peers')}
+            className={`timetable-toggle-btn ${activeSubTab === 'global_search' ? 'active' : ''}`}
+            onClick={() => setActiveSubTab('global_search')}
           >
-            Peers Directory
+            Search Public Resources
           </button>
         </div>
       </div>
 
+      {success && (
+        <div className="success-box" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <CheckCircle size={16} weight="fill" />
+          <span>{success}</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="alert-box" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Warning size={16} weight="bold" />
+          <span>{error}</span>
+        </div>
+      )}
+
       {activeSubTab === 'mine' ? (
         /* ============================================================
-           MY RESOURCES TAB
+           MY RESOURCES VIEW
            ============================================================ */
         <div>
-          <div className="resources-header-row" style={{ marginBottom: '24px' }}>
-            <div>
-              <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>Study Resources</h2>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-                Store course guides, lectures, and images. Configure visibility to share with peers.
-              </p>
-            </div>
+          <div style={{ marginBottom: '24px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>Study Resources</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+              Upload actual study guides and slides to your public/private folders.
+            </p>
           </div>
 
           <div className="timetable-split-layout">
-            {/* File List */}
+            {/* File list card */}
             <div className="cohort-card nm-out" style={{ padding: '24px' }}>
-              {/* Category tabs */}
               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
-                {['all', 'pdf', 'image', 'video', 'link'].map(cat => (
+                {['all', 'pdf', 'image', 'video'].map(cat => (
                   <button
                     key={cat}
                     className={`pref-day-btn ${activeCategory === cat ? 'active' : ''}`}
@@ -199,11 +239,11 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {/* Public/Private indicator button */}
+                        {/* Public / Private visibility eye toggle */}
                         <button
                           className="cohort-btn"
                           onClick={() => onToggleFileVisibility(file.id, !file.isPublic)}
-                          title={file.isPublic ? 'Visible to peers' : 'Private to me'}
+                          title={file.isPublic ? 'Globally searchable by anyone' : 'Private to me'}
                           style={{ padding: '6px', border: 'none', background: 'transparent', boxShadow: 'none' }}
                         >
                           {file.isPublic ? (
@@ -216,7 +256,7 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
                         <button 
                           className="cohort-btn" 
                           onClick={() => handleDownload(file)}
-                          style={{ padding: '6px' }}
+                          title="Open or Download file"
                         >
                           <Download size={14} weight="bold" />
                         </button>
@@ -225,7 +265,7 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
                           className="cohort-btn" 
                           onClick={() => {
                             if (confirm(`Are you sure you want to delete "${file.title}"?`)) {
-                              onDeleteFile(file.id);
+                              onDeleteFile(file.id, file.url);
                             }
                           }}
                           style={{ padding: '6px', border: 'none', background: 'transparent', boxShadow: 'none' }}
@@ -237,45 +277,45 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
                   ))
                 ) : (
                   <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '60px 0' }}>
-                    No files found in this category.
+                    No files uploaded yet. Select a file on the right to start!
                   </div>
                 )}
               </div>
             </div>
 
-            {/* File Form */}
+            {/* Upload form card */}
             <div className="cohort-card nm-out" style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '20px' }}>Upload Resource Reference</h3>
-              
-              {error && (
-                <div className="alert-box" style={{ marginBottom: '16px' }}>
-                  <Warning size={16} />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {success && (
-                <div className="success-box" style={{ marginBottom: '16px' }}>
-                  <span>{success}</span>
-                </div>
-              )}
+              <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '20px' }}>Upload Study File</h3>
 
               <form onSubmit={handleUploadSubmit}>
+                <div className="form-group">
+                  <label className="form-label">Select File</label>
+                  <input 
+                    type="file" 
+                    id="actual-file-picker"
+                    className="cohort-input" 
+                    onChange={handleFileChange}
+                    style={{ padding: '8px' }}
+                    required
+                  />
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">Resource Title</label>
                   <input 
                     type="text" 
                     className="cohort-input" 
-                    placeholder="e.g. Chapter 4 Slides" 
+                    placeholder="Chapter 2 slides..." 
                     value={title} 
                     onChange={e => setTitle(e.target.value)}
+                    required
                   />
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Linked Course</label>
                   <select className="cohort-select" value={courseId} onChange={e => setCourseId(e.target.value)}>
-                    <option value="">None / Other</option>
+                    <option value="">None / General Reference</option>
                     {courses.map(c => (
                       <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
                     ))}
@@ -283,27 +323,15 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Resource Type</label>
+                  <label className="form-label">Detected Type</label>
                   <select className="cohort-select" value={fileType} onChange={e => setFileType(e.target.value)}>
                     <option value="pdf">PDF Document</option>
                     <option value="image">Image/Graph</option>
-                    <option value="video">Video Lecture</option>
-                    <option value="link">Web Resource Link</option>
+                    <option value="video">Lecture Video</option>
                   </select>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">File Size</label>
-                  <input 
-                    type="text" 
-                    className="cohort-input" 
-                    placeholder="e.g. 1.2 MB or 4.5 MB" 
-                    value={fileSize} 
-                    onChange={e => setFileSize(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '16px 0' }}>
                   <input 
                     type="checkbox" 
                     id="isPublicCheck"
@@ -311,14 +339,28 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
                     onChange={e => setIsPublic(e.target.checked)}
                     style={{ width: '16px', height: '16px', cursor: 'pointer' }}
                   />
-                  <label htmlFor="isPublicCheck" className="form-label" style={{ margin: 0, cursor: 'pointer' }}>
-                    Make this resource public to other students
+                  <label htmlFor="isPublicCheck" className="form-label" style={{ margin: 0, cursor: 'pointer', fontWeight: '700' }}>
+                    Make visible to everyone (globally searchable)
                   </label>
                 </div>
 
-                <button type="submit" className="cohort-btn cohort-btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '12px' }}>
-                  <Plus size={16} />
-                  Upload Resource Metadata
+                <button 
+                  type="submit" 
+                  className="cohort-btn cohort-btn-primary" 
+                  style={{ width: '100%', justifyContent: 'center', marginTop: '12px', gap: '8px' }}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <>
+                      <Spinner size={16} className="animate-spin" />
+                      <span>Uploading to Supabase Storage...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} weight="bold" />
+                      <span>Upload to Resources</span>
+                    </>
+                  )}
                 </button>
               </form>
             </div>
@@ -326,96 +368,82 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
         </div>
       ) : (
         /* ============================================================
-           PEERS DIRECTORY TAB
+           GLOBAL PUBLIC SEARCH VIEW
            ============================================================ */
         <div>
-          <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>Peers Directory</h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '24px' }}>
-            Find registered students and view their shared public study materials.
-          </p>
+          <div style={{ marginBottom: '24px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>Global Public Search</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+              Search globally shared materials uploaded by any student on Estudy.
+            </p>
+          </div>
 
-          {!selectedPeer ? (
-            <div>
-              {/* Search Box */}
-              <div className="peers-search-bar">
-                <input 
-                  type="text" 
-                  className="cohort-input" 
-                  placeholder="Search students by name or email..." 
-                  value={peerSearchQuery}
-                  onChange={e => setPeerSearchQuery(e.target.value)}
-                />
-              </div>
+          <div className="cohort-card nm-out" style={{ padding: '24px' }}>
+            <form onSubmit={handleGlobalSearch} style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+              <input 
+                type="text" 
+                className="cohort-input" 
+                placeholder="e.g. introduction to economics" 
+                value={globalSearchQuery}
+                onChange={e => setGlobalSearchQuery(e.target.value)}
+                style={{ flex: 1 }}
+                required
+              />
+              <button type="submit" className="cohort-btn cohort-btn-primary" style={{ gap: '8px' }}>
+                <MagnifyingGlass size={16} weight="bold" />
+                <span>Search Resources</span>
+              </button>
+            </form>
 
-              {/* Peers grid */}
-              <div className="peers-grid">
-                {filteredPeers.length > 0 ? (
-                  filteredPeers.map(peer => (
-                    <div 
-                      key={peer.id} 
-                      className="peer-profile-card nm-out"
-                      onClick={() => setSelectedPeer(peer)}
-                    >
-                      <div className="peer-avatar">
-                        <User size={24} weight="bold" />
-                      </div>
-                      <strong style={{ fontSize: '14px', display: 'block', color: 'var(--text-primary)' }}>{peer.name}</strong>
-                      <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', wordBreak: 'break-all' }}>{peer.email}</span>
-                      <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '700', marginTop: '8px' }}>
-                        {peer.year} | {peer.group}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="cohort-card" style={{ gridColumn: 'span 3', textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
-                    No students found matching your search.
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            /* Selected Peer's Public Files view */
-            <div className="cohort-card nm-out" style={{ padding: '24px' }}>
-              <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px' }}>
-                <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: '800' }}>{selectedPeer.name}'s Public Resources</h3>
-                  <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{selectedPeer.email} • {selectedPeer.year}</span>
-                </div>
-                <button className="cohort-btn" onClick={() => setSelectedPeer(null)}>
-                  Back to Directory
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {peerFiles.length > 0 ? (
-                  peerFiles.map(file => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {globalSearchResults.length > 0 ? (
+                globalSearchResults.map(file => {
+                  const isOwnFile = file.userId === userEmail;
+                  return (
                     <div key={file.id} style={{ display: 'flex', justify: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'var(--bg-navigation)', borderRadius: '12px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                         {getIcon(file.fileType)}
                         <div>
                           <strong style={{ fontSize: '13.5px', display: 'block', color: 'var(--text-primary)' }}>{file.title}</strong>
                           <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                            {file.size} • {file.fileType.toUpperCase()} • {file.uploadDate}
+                            {file.size} • {file.fileType.toUpperCase()} • Shared by: {file.userId}
                           </span>
                         </div>
                       </div>
-                      <button 
-                        className="cohort-btn" 
-                        onClick={() => handleDownload(file)}
-                        title="Download peer resource"
-                      >
-                        <Download size={14} weight="bold" />
-                      </button>
+
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {!isOwnFile && (
+                          <button 
+                            className="cohort-btn cohort-btn-primary" 
+                            onClick={() => handleCopyResource(file)}
+                            style={{ padding: '6px 12px', fontSize: '11.5px', gap: '4px' }}
+                          >
+                            <Plus size={12} weight="bold" />
+                            Add to My Resources
+                          </button>
+                        )}
+                        <button 
+                          className="cohort-btn" 
+                          onClick={() => handleDownload(file)}
+                          style={{ padding: '6px' }}
+                        >
+                          <Download size={14} weight="bold" />
+                        </button>
+                      </div>
                     </div>
-                  ))
-                ) : (
-                  <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '40px 0' }}>
-                    This user hasn't shared any public study materials.
-                  </div>
-                )}
-              </div>
+                  );
+                })
+              ) : searched ? (
+                <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '40px 0' }}>
+                  No public resources found matching your search.
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '40px 0' }}>
+                  Enter a keyword above to scan the globally shared study repository.
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       )}
     </motion.div>

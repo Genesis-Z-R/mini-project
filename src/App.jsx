@@ -9,9 +9,9 @@ import { Groups } from './components/Groups';
 import { Quizzes } from './components/Quizzes';
 import { Profile } from './components/Profile';
 import { Setting } from './components/Setting';
-import { auth, firestoreDb, DatabaseService } from './utils/db';
-import { collection, onSnapshot, doc, query, where } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
+import { Peers } from './components/Peers';
+import { auth, DatabaseService, onAuthStateChanged, signOut } from './utils/db';
+import { Warning } from '@phosphor-icons/react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -25,16 +25,17 @@ function App() {
   const [groups, setGroups] = useState([]);
   const [studySessions, setStudySessions] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
+  const [friendships, setFriendships] = useState([]);
   const [profile, setProfile] = useState({
     name: 'Student',
     email: '',
     indexNumber: '',
     reference: '',
-    year: 'Year 3',
-    gender: 'Male',
-    group: 'Group 2',
+    year: '',
+    gender: '',
     notificationsEnabled: true,
-    isPublic: true
+    isPublic: true,
+    dailyDigestEnabled: true
   });
 
   // Theme State
@@ -53,10 +54,10 @@ function App() {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  // Auth State Listener & Subscriptions
+  // Auth State Listener
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (user && user.emailVerified) {
+      if (user) {
         setCurrentUser(user);
         setAuthChecking(false);
       } else {
@@ -68,64 +69,54 @@ function App() {
     return () => unsubscribeAuth();
   }, []);
 
-  // Sync state queries filtered by authenticated user ID
-  useEffect(() => {
-    if (!currentUser) return;
-    const emailKey = currentUser.email.toLowerCase().trim();
-
-    const qCourses = query(collection(firestoreDb, 'courses'), where('userId', '==', emailKey));
-    const unsubCourses = onSnapshot(qCourses, (snapshot) => {
-      setCourses(snapshot.docs.map(d => d.data()));
-    });
-
-    const qSchedule = query(collection(firestoreDb, 'schedule'), where('userId', '==', emailKey));
-    const unsubSchedule = onSnapshot(qSchedule, (snapshot) => {
-      setSchedule(snapshot.docs.map(d => d.data()));
-    });
-
-    // Files: Show own files + public files from other users
-    const unsubFiles = onSnapshot(collection(firestoreDb, 'files'), (snapshot) => {
-      const list = snapshot.docs.map(d => d.data());
-      setFiles(list);
-    });
-
-    // Groups (Study Circles): show all groups
-    const unsubGroups = onSnapshot(collection(firestoreDb, 'groups'), (snapshot) => {
-      const list = snapshot.docs.map(d => d.data());
-      setGroups(list);
-    });
-
-    const qStudySessions = query(collection(firestoreDb, 'study_sessions'), where('userId', '==', emailKey));
-    const unsubStudySessions = onSnapshot(qStudySessions, (snapshot) => {
-      setStudySessions(snapshot.docs.map(d => d.data()));
-    });
-
-    const qQuizzes = query(collection(firestoreDb, 'quizzes'), where('userId', '==', emailKey));
-    const unsubQuizzes = onSnapshot(qQuizzes, (snapshot) => {
-      setQuizzes(snapshot.docs.map(d => d.data()));
-    });
-
-    const unsubProfile = onSnapshot(doc(firestoreDb, 'users', emailKey), (docSnap) => {
-      if (docSnap.exists()) {
-        setProfile(docSnap.data());
+  // Sync state data from Supabase
+  const refreshAllData = async (emailKey) => {
+    try {
+      const profileData = await DatabaseService.getProfile(emailKey);
+      if (profileData) {
+        setProfile(profileData);
       }
-    });
+      
+      const coursesList = await DatabaseService.getCourses(emailKey);
+      setCourses(coursesList);
 
-    return () => {
-      unsubCourses();
-      unsubSchedule();
-      unsubFiles();
-      unsubGroups();
-      unsubStudySessions();
-      unsubQuizzes();
-      unsubProfile();
-    };
+      const scheduleList = await DatabaseService.getSchedule(emailKey);
+      setSchedule(scheduleList);
+
+      // Files: Load own files for Resources tab
+      const filesList = await DatabaseService.getFiles(emailKey);
+      setFiles(filesList);
+
+      const groupsList = await DatabaseService.getGroups();
+      setGroups(groupsList);
+
+      const sessionsList = await DatabaseService.getStudySessions(emailKey);
+      setStudySessions(sessionsList);
+
+      const quizzesList = await DatabaseService.getQuizzes(emailKey);
+      setQuizzes(quizzesList);
+
+      const friendshipsList = await DatabaseService.getFriendships(emailKey);
+      setFriendships(friendshipsList);
+    } catch (err) {
+      console.error("Error refreshing Supabase data:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (!currentUser) {
+      setCourses([]);
+      setSchedule([]);
+      setFiles([]);
+      setGroups([]);
+      setStudySessions([]);
+      setQuizzes([]);
+      setFriendships([]);
+      return;
+    }
+    const emailKey = currentUser.email.toLowerCase().trim();
+    refreshAllData(emailKey);
   }, [currentUser]);
-
-  // Auth Listener imports helper
-  function onAuthStateChanged(auth, callback) {
-    return auth.onAuthStateChanged(callback);
-  }
 
   const handleSignOut = () => {
     signOut(auth);
@@ -137,15 +128,24 @@ function App() {
 
   // Schedule Handlers
   const handleAddScheduleItem = async (item) => {
-    return await DatabaseService.addScheduleItem(currentUser.email.toLowerCase(), item);
+    const res = await DatabaseService.addScheduleItem(currentUser.email.toLowerCase(), item);
+    if (res.success) {
+      await refreshAllData(currentUser.email);
+    }
+    return res;
   };
 
   const handleRemoveScheduleItem = async (id) => {
     await DatabaseService.removeScheduleItem(id);
+    await refreshAllData(currentUser.email);
   };
 
   const handleUpdateScheduleItem = async (id, item) => {
-    return await DatabaseService.updateScheduleItem(id, currentUser.email.toLowerCase(), item);
+    const res = await DatabaseService.updateScheduleItem(id, currentUser.email.toLowerCase(), item);
+    if (res.success) {
+      await refreshAllData(currentUser.email);
+    }
+    return res;
   };
 
   // Study Sessions handler
@@ -154,6 +154,7 @@ function App() {
       ...session,
       userId: currentUser.email.toLowerCase()
     });
+    await refreshAllData(currentUser.email);
   };
 
   // Resources / Files Handlers
@@ -162,19 +163,23 @@ function App() {
       ...fileData,
       userId: currentUser.email.toLowerCase()
     });
+    await refreshAllData(currentUser.email);
   };
 
-  const handleDeleteFile = async (id) => {
-    await DatabaseService.deleteFile(id);
+  const handleDeleteFile = async (id, url) => {
+    await DatabaseService.deleteFile(id, url);
+    await refreshAllData(currentUser.email);
   };
 
   const handleToggleFileVisibility = async (id, isPublic) => {
     await DatabaseService.toggleFileVisibility(id, isPublic);
+    await refreshAllData(currentUser.email);
   };
 
   // Profile Handler
   const handleUpdateProfile = async (updatedProfile) => {
     await DatabaseService.updateProfile(currentUser.email, updatedProfile);
+    await refreshAllData(currentUser.email);
   };
 
   // Quiz Handlers
@@ -183,10 +188,12 @@ function App() {
       ...quiz,
       userId: currentUser.email.toLowerCase()
     });
+    await refreshAllData(currentUser.email);
   };
 
   const handleDeleteQuiz = async (id) => {
     await DatabaseService.deleteQuiz(id);
+    await refreshAllData(currentUser.email);
   };
 
   // Study Circles (Groups) handlers
@@ -195,6 +202,7 @@ function App() {
       ...circle,
       creatorId: currentUser.email.toLowerCase()
     });
+    await refreshAllData(currentUser.email);
   };
 
   const handleToggleJoinGroup = async (id, isJoined) => {
@@ -204,10 +212,12 @@ function App() {
     } else {
       await DatabaseService.joinStudyCircle(id, email);
     }
+    await refreshAllData(currentUser.email);
   };
 
   const handlePromoteCircleAdmin = async (groupId, email) => {
     await DatabaseService.promoteToAdmin(groupId, email);
+    await refreshAllData(currentUser.email);
   };
 
   const handleCirclePostResource = async (groupId, resource) => {
@@ -215,6 +225,7 @@ function App() {
       ...resource,
       uploaderEmail: currentUser.email.toLowerCase()
     });
+    await refreshAllData(currentUser.email);
   };
 
   if (authChecking) {
@@ -230,6 +241,9 @@ function App() {
   if (!currentUser) {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
+
+  // Profile fields check to show warning alert
+  const isProfileIncomplete = !profile?.indexNumber || !profile?.reference || !profile?.year || !profile?.gender;
 
   const renderPanel = () => {
     switch (activeTab) {
@@ -263,6 +277,7 @@ function App() {
             onAddFile={handleAddFile} 
             onDeleteFile={handleDeleteFile}
             onToggleFileVisibility={handleToggleFileVisibility}
+            onRefresh={() => refreshAllData(currentUser.email.toLowerCase())}
           />
         );
       case 'schedule':
@@ -273,6 +288,15 @@ function App() {
             onAddScheduleItem={handleAddScheduleItem} 
             onRemoveScheduleItem={handleRemoveScheduleItem} 
             onUpdateScheduleItem={handleUpdateScheduleItem}
+          />
+        );
+      case 'peers':
+        return (
+          <Peers 
+            friendships={friendships}
+            userEmail={currentUser.email.toLowerCase()}
+            onRefresh={() => refreshAllData(currentUser.email.toLowerCase())}
+            onNavigate={setActiveTab}
           />
         );
       case 'profile':
@@ -318,6 +342,14 @@ function App() {
         onSignOut={handleSignOut}
       />
       <main className="estudy-workspace">
+        {isProfileIncomplete && (
+          <div className="alert-box" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Warning size={18} weight="bold" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: '13px', fontWeight: '700' }}>
+              ⚠️ Please complete your profile details (Index Number, Reference Number, Year, Gender) in the Profile tab to enable your full academic companion credentials.
+            </span>
+          </div>
+        )}
         {renderPanel()}
       </main>
     </div>

@@ -1,4 +1,4 @@
-import { SquaresFour, ListChecks, Folder, Calendar, User, Gear, SignOut } from '@phosphor-icons/react';
+import { SquaresFour, ListChecks, Folder, Calendar, User, Gear, UsersThree, SignOut } from '@phosphor-icons/react';
 
 export function Sidebar({ currentTab, setCurrentTab, user, onSignOut }) {
   const menuItems = [
@@ -6,6 +6,7 @@ export function Sidebar({ currentTab, setCurrentTab, user, onSignOut }) {
     { id: 'quizzes', label: 'Quizzes', icon: ListChecks },
     { id: 'resources', label: 'Resources', icon: Folder },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
+    { id: 'peers', label: 'Peers', icon: UsersThree },
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'setting', label: 'Setting', icon: Gear }
   ];

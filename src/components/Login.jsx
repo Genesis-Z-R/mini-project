@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { auth, DatabaseService } from '../utils/db';
 import { 
+  auth, 
+  DatabaseService, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
   sendEmailVerification 
-} from "firebase/auth";
+} from '../utils/db';
 import { Warning, CheckCircle, EnvelopeOpen } from '@phosphor-icons/react';
 
 export function Login({ onLoginSuccess }) {

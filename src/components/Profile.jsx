@@ -8,9 +8,8 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
   const [email, setEmail] = useState('');
   const [indexNumber, setIndexNumber] = useState('');
   const [reference, setReference] = useState('');
-  const [year, setYear] = useState('Year 1');
-  const [gender, setGender] = useState('—');
-  const [group, setGroup] = useState('Group 2');
+  const [year, setYear] = useState('');
+  const [gender, setGender] = useState('');
 
   // Initialize fields with current profile values
   useEffect(() => {
@@ -19,9 +18,8 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
       setEmail(profile.email || '');
       setIndexNumber(profile.indexNumber || '');
       setReference(profile.reference || '');
-      setYear(profile.year || 'Year 1');
-      setGender(profile.gender || '—');
-      setGroup(profile.group || 'Group 2');
+      setYear(profile.year || '');
+      setGender(profile.gender || '');
     }
   }, [profile, isEditing]);
 
@@ -33,8 +31,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
       indexNumber: indexNumber.trim(),
       reference: reference.trim(),
       year,
-      gender,
-      group: group.trim()
+      gender
     });
     setIsEditing(false);
   };
@@ -97,10 +94,11 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 className="cohort-input" 
                 value={indexNumber} 
                 onChange={e => setIndexNumber(e.target.value)} 
+                placeholder="e.g. UG-18-5023"
                 style={{ width: '180px', padding: '6px 12px', fontSize: '13px' }}
               />
             ) : (
-              <span className="profile-row-value">{profile.indexNumber}</span>
+              <span className="profile-row-value">{profile.indexNumber || '—'}</span>
             )}
           </div>
 
@@ -112,10 +110,11 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 className="cohort-input" 
                 value={reference} 
                 onChange={e => setReference(e.target.value)} 
+                placeholder="e.g. REF-238491"
                 style={{ width: '180px', padding: '6px 12px', fontSize: '13px' }}
               />
             ) : (
-              <span className="profile-row-value">{profile.reference}</span>
+              <span className="profile-row-value">{profile.reference || '—'}</span>
             )}
           </div>
 
@@ -128,17 +127,18 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 onChange={e => setYear(e.target.value)}
                 style={{ width: '180px', padding: '6px 12px', fontSize: '13px' }}
               >
+                <option value="">Select Year...</option>
                 <option value="Year 1">Year 1</option>
                 <option value="Year 2">Year 2</option>
                 <option value="Year 3">Year 3</option>
                 <option value="Year 4">Year 4</option>
               </select>
             ) : (
-              <span className="profile-row-value">{profile.year}</span>
+              <span className="profile-row-value">{profile.year || '—'}</span>
             )}
           </div>
 
-          <div className="profile-table-row">
+          <div className="profile-table-row" style={{ borderBottom: 'none' }}>
             <span className="profile-row-label">Gender</span>
             {isEditing ? (
               <select 
@@ -147,27 +147,13 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 onChange={e => setGender(e.target.value)}
                 style={{ width: '180px', padding: '6px 12px', fontSize: '13px' }}
               >
+                <option value="">Select Gender...</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
                 <option value="—">—</option>
               </select>
             ) : (
-              <span className="profile-row-value">{profile.gender}</span>
-            )}
-          </div>
-
-          <div className="profile-table-row" style={{ borderBottom: 'none' }}>
-            <span className="profile-row-label">Study Group</span>
-            {isEditing ? (
-              <input 
-                type="text" 
-                className="cohort-input" 
-                value={group} 
-                onChange={e => setGroup(e.target.value)} 
-                style={{ width: '180px', padding: '6px 12px', fontSize: '13px' }}
-              />
-            ) : (
-              <span className="profile-row-value">{profile.group}</span>
+              <span className="profile-row-value">{profile.gender || '—'}</span>
             )}
           </div>
         </div>
