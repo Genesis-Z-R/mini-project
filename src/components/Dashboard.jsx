@@ -323,35 +323,6 @@ export function Dashboard({
               </div>
             </div>
           </div>
-
-          {/* My Courses Section */}
-          <div className="cohort-card nm-out" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '800' }}>My Courses</h3>
-              <button className="start-quiz-link" onClick={() => onNavigate('quizzes')} style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontWeight: '700' }}>
-                Take Quiz
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {courses.map((course, idx) => (
-                <div key={course.id} style={{ display: 'flex', alignItems: 'center', justify: 'space-between', padding: '14px 18px', background: 'var(--bg-navigation)', borderRadius: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ background: idx % 2 === 0 ? 'var(--accent-soft)' : 'rgba(94,129,244,0.1)', color: idx % 2 === 0 ? 'var(--accent)' : '#5E81F4', width: '38px', height: '38px', borderRadius: '8px', display: 'flex', alignItems: 'center', justify: 'center' }}>
-                      <BookOpen size={20} />
-                    </div>
-                    <div>
-                      <strong style={{ fontSize: '13.5px', display: 'block' }}>{course.code} - {course.name}</strong>
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>15 Lessons • 40 Hours</span>
-                    </div>
-                  </div>
-                  <button className="cohort-btn" onClick={() => onNavigate('quizzes')} style={{ padding: '6px 12px', fontSize: '11.5px', fontWeight: '600' }}>
-                    View Course
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* ==========================================

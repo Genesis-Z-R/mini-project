@@ -1,18 +1,18 @@
-import { SquaresFour, ListChecks, Folder, Calendar, User, Gear, UsersThree, SignOut } from '@phosphor-icons/react';
+import { SquaresFour, Calendar, User, Gear, UsersThree, GraduationCap, Globe, SignOut } from '@phosphor-icons/react';
 
-export function Sidebar({ currentTab, setCurrentTab, user, onSignOut }) {
+export function Sidebar({ currentTab, setCurrentTab, user, onSignOut, className }) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: SquaresFour },
-    { id: 'quizzes', label: 'Quizzes', icon: ListChecks },
-    { id: 'resources', label: 'Resources', icon: Folder },
+    { id: 'courses', label: 'My Courses', icon: GraduationCap },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
     { id: 'peers', label: 'Peers', icon: UsersThree },
+    { id: 'global_search', label: 'Global Search', icon: Globe },
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'setting', label: 'Setting', icon: Gear }
   ];
 
   return (
-    <aside className="estudy-sidebar">
+    <aside className={`estudy-sidebar ${className || ''}`}>
       {/* Brand Header */}
       <div className="estudy-logo-area">
         <div className="estudy-logo-icon">E</div>

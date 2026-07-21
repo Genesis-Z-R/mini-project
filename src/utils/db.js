@@ -425,6 +425,28 @@ export const DatabaseService = {
       .eq('isPublic', true);
     if (error) throw error;
     return data || [];
+  },
+
+  // Quiz Attempts queries & mutations
+  async getQuizAttempts(userId) {
+    const { data, error } = await supabase
+      .from('quiz_attempts')
+      .select('*')
+      .eq('userId', userId.toLowerCase().trim());
+    if (error) throw error;
+    return data || [];
+  },
+
+  async saveQuizAttempt(attempt) {
+    const id = 'qa_' + Date.now();
+    const newAttempt = {
+      ...attempt,
+      id,
+      attemptDate: new Date().toISOString().split('T')[0]
+    };
+    const { error } = await supabase.from('quiz_attempts').insert([newAttempt]);
+    if (error) throw error;
+    return newAttempt;
   }
 };
 export default DatabaseService;

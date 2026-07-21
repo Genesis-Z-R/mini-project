@@ -6,17 +6,18 @@ import { Dashboard } from './components/Dashboard';
 import { Schedule } from './components/Schedule';
 import { Repository } from './components/Repository';
 import { Groups } from './components/Groups';
-import { Quizzes } from './components/Quizzes';
 import { Profile } from './components/Profile';
 import { Setting } from './components/Setting';
 import { Peers } from './components/Peers';
+import { Courses } from './components/Courses';
 import { auth, DatabaseService, onAuthStateChanged, signOut } from './utils/db';
-import { Warning } from '@phosphor-icons/react';
+import { Warning, List, User } from '@phosphor-icons/react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecking, setAuthChecking] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   // Database States
   const [courses, setCourses] = useState([]);
@@ -26,6 +27,7 @@ function App() {
   const [studySessions, setStudySessions] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
   const [friendships, setFriendships] = useState([]);
+  const [quizAttempts, setQuizAttempts] = useState([]);
   const [profile, setProfile] = useState({
     name: 'Student',
     email: '',
@@ -83,7 +85,7 @@ function App() {
       const scheduleList = await DatabaseService.getSchedule(emailKey);
       setSchedule(scheduleList);
 
-      // Files: Load own files for Resources tab
+      // Files: Load own files
       const filesList = await DatabaseService.getFiles(emailKey);
       setFiles(filesList);
 
@@ -98,6 +100,9 @@ function App() {
 
       const friendshipsList = await DatabaseService.getFriendships(emailKey);
       setFriendships(friendshipsList);
+
+      const attemptsList = await DatabaseService.getQuizAttempts(emailKey);
+      setQuizAttempts(attemptsList);
     } catch (err) {
       console.error("Error refreshing Supabase data:", err);
     }
@@ -112,6 +117,7 @@ function App() {
       setStudySessions([]);
       setQuizzes([]);
       setFriendships([]);
+      setQuizAttempts([]);
       return;
     }
     const emailKey = currentUser.email.toLowerCase().trim();
@@ -124,6 +130,17 @@ function App() {
 
   const handleLoginSuccess = (user) => {
     setCurrentUser(user);
+  };
+
+  // Course Handlers
+  const handleAddCourse = async (course) => {
+    await DatabaseService.addCourse(currentUser.email.toLowerCase(), course);
+    await refreshAllData(currentUser.email);
+  };
+
+  const handleDeleteCourse = async (id) => {
+    await DatabaseService.deleteCourse(id);
+    await refreshAllData(currentUser.email);
   };
 
   // Schedule Handlers
@@ -196,6 +213,14 @@ function App() {
     await refreshAllData(currentUser.email);
   };
 
+  const handleSaveQuizAttempt = async (attempt) => {
+    await DatabaseService.saveQuizAttempt({
+      ...attempt,
+      userId: currentUser.email.toLowerCase()
+    });
+    await refreshAllData(currentUser.email);
+  };
+
   // Study Circles (Groups) handlers
   const handleCreateStudyCircle = async (circle) => {
     await DatabaseService.createStudyCircle({
@@ -259,16 +284,26 @@ function App() {
             profile={profile}
           />
         );
-      case 'quizzes':
+      case 'courses':
         return (
-          <Quizzes 
-            courses={courses} 
-            quizzes={quizzes} 
+          <Courses 
+            courses={courses}
+            files={files}
+            quizzes={quizzes}
+            quizAttempts={quizAttempts}
+            userEmail={currentUser.email.toLowerCase()}
+            onAddCourse={handleAddCourse}
+            onDeleteCourse={handleDeleteCourse}
+            onAddFile={handleAddFile}
+            onDeleteFile={handleDeleteFile}
+            onToggleFileVisibility={handleToggleFileVisibility}
             onCreateQuiz={handleCreateQuiz}
             onDeleteQuiz={handleDeleteQuiz}
+            onSaveAttempt={handleSaveQuizAttempt}
+            onRefresh={() => refreshAllData(currentUser.email.toLowerCase())}
           />
         );
-      case 'resources':
+      case 'global_search':
         return (
           <Repository 
             courses={courses} 
@@ -278,6 +313,7 @@ function App() {
             onDeleteFile={handleDeleteFile}
             onToggleFileVisibility={handleToggleFileVisibility}
             onRefresh={() => refreshAllData(currentUser.email.toLowerCase())}
+            initialSubTab="global_search"
           />
         );
       case 'schedule':
@@ -335,11 +371,42 @@ function App() {
 
   return (
     <div className="estudy-layout">
+      {/* Mobile Top Header */}
+      <header className="mobile-top-bar">
+        <button 
+          className="mobile-menu-toggle"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          aria-label="Toggle Menu"
+        >
+          <List size={22} weight="bold" />
+        </button>
+        <span className="mobile-brand-title">Estudy</span>
+        <button 
+          className="mobile-profile-shortcut"
+          onClick={() => setActiveTab('profile')}
+          aria-label="View Profile"
+        >
+          <User size={20} weight="bold" />
+        </button>
+      </header>
+
+      {/* Backdrop overlay for mobile sidebar drawer */}
+      {isMobileMenuOpen && (
+        <div 
+          className="mobile-sidebar-backdrop" 
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       <Sidebar 
         currentTab={activeTab === 'groups' ? 'dashboard' : activeTab} 
-        setCurrentTab={setActiveTab} 
+        setCurrentTab={(tab) => {
+          setActiveTab(tab);
+          setIsMobileMenuOpen(false); // Auto-close drawer on selection
+        }} 
         user={currentUser} 
         onSignOut={handleSignOut}
+        className={isMobileMenuOpen ? 'mobile-open' : ''}
       />
       <main className="estudy-workspace">
         {isProfileIncomplete && (

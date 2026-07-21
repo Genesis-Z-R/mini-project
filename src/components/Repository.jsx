@@ -1,17 +1,27 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
-  Plus, Trash, Warning, Download, MagnifyingGlass, Eye, EyeSlash, FilePdf, FileImage, Video, Link as LinkIcon, BookOpen, CheckCircle, Spinner 
+  Plus, Trash, Warning, Download, MagnifyingGlass, Eye, EyeSlash, FilePdf, FileImage, Video, Link as LinkIcon, BookOpen, CheckCircle, Spinner, FileDoc 
 } from '@phosphor-icons/react';
 import { DatabaseService } from '../utils/db';
 
-export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile, onToggleFileVisibility, onRefresh }) {
-  const [activeSubTab, setActiveSubTab] = useState('mine'); // 'mine' | 'global_search'
+export function Repository({ 
+  courses, 
+  files, 
+  userEmail, 
+  onAddFile, 
+  onDeleteFile, 
+  onToggleFileVisibility, 
+  onRefresh,
+  nestedMode = false,
+  initialSubTab = 'mine'
+}) {
+  const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
   const [activeCategory, setActiveCategory] = useState('all');
 
   // File Upload Form State
   const [title, setTitle] = useState('');
-  const [courseId, setCourseId] = useState('');
+  const [courseId, setCourseId] = useState(courses[0]?.id || '');
   const [fileType, setFileType] = useState('pdf');
   const [selectedFile, setSelectedFile] = useState(null);
   const [isPublic, setIsPublic] = useState(true);
@@ -35,6 +45,8 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
       setFileType('image');
     } else if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) {
       setFileType('video');
+    } else if (['docx', 'doc'].includes(ext)) {
+      setFileType('docx');
     } else {
       setFileType('pdf'); // Default standard document
     }
@@ -71,9 +83,10 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
         : (size / (1024 * 1024)).toFixed(1) + ' MB';
 
       // 2. Save metadata reference in files table
+      const linkedCourse = nestedMode ? courses[0]?.id : (courseId || 'none');
       await onAddFile({
         title: title.trim(),
-        courseId: courseId || 'none',
+        courseId: linkedCourse,
         fileType,
         size: sizeStr,
         isPublic,
@@ -82,7 +95,6 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
 
       setSuccess('Resource uploaded successfully to Supabase Storage!');
       setTitle('');
-      setCourseId('');
       setSelectedFile(null);
       
       // Reset file input
@@ -90,9 +102,10 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
       if (fileInput) fileInput.value = '';
 
       setTimeout(() => setSuccess(''), 3000);
+      if (onRefresh) onRefresh();
     } catch (err) {
       console.error(err);
-      setError('Upload failed. Please check your network and storage configurations.');
+      setError('Upload failed. Please check your storage settings.');
     } finally {
       setUploading(false);
     }
@@ -115,7 +128,7 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
     try {
       await DatabaseService.addPublicFileToMine(file, userEmail);
       setSuccess(`"${file.title}" has been added to your My Resources folder!`);
-      onRefresh();
+      if (onRefresh) onRefresh();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError('Error copying resource to your list.');
@@ -125,7 +138,6 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
 
   const handleDownload = (file) => {
     if (file.url) {
-      // Open file in new tab or download from Supabase storage URL
       window.open(file.url, '_blank');
     } else {
       // Fallback mock download
@@ -153,7 +165,7 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
       case 'pdf': return <FilePdf size={20} style={{ color: '#EF4444' }} />;
       case 'image': return <FileImage size={20} style={{ color: '#3B82F6' }} />;
       case 'video': return <Video size={20} style={{ color: '#8B5CF6' }} />;
-      case 'link': return <LinkIcon size={20} style={{ color: '#10B981' }} />;
+      case 'docx': return <FileDoc size={20} style={{ color: '#2563EB' }} />;
       default: return <BookOpen size={20} />;
     }
   };
@@ -164,23 +176,25 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
-      {/* Sub Tab Switcher */}
-      <div className="timetable-toggle-container" style={{ marginBottom: '24px' }}>
-        <div className="timetable-toggle-bar">
-          <button 
-            className={`timetable-toggle-btn ${activeSubTab === 'mine' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('mine')}
-          >
-            My Resources
-          </button>
-          <button 
-            className={`timetable-toggle-btn ${activeSubTab === 'global_search' ? 'active' : ''}`}
-            onClick={() => setActiveSubTab('global_search')}
-          >
-            Search Public Resources
-          </button>
+      {/* Sub Tab Switcher - Only display if not nested and not forced global search tab */}
+      {!nestedMode && initialSubTab !== 'global_search' && (
+        <div className="timetable-toggle-container" style={{ marginBottom: '24px' }}>
+          <div className="timetable-toggle-bar">
+            <button 
+              className={`timetable-toggle-btn ${activeSubTab === 'mine' ? 'active' : ''}`}
+              onClick={() => setActiveSubTab('mine')}
+            >
+              My Resources
+            </button>
+            <button 
+              className={`timetable-toggle-btn ${activeSubTab === 'global_search' ? 'active' : ''}`}
+              onClick={() => setActiveSubTab('global_search')}
+            >
+              Search Public Resources
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {success && (
         <div className="success-box" style={{ marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -198,21 +212,23 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
 
       {activeSubTab === 'mine' ? (
         /* ============================================================
-           MY RESOURCES VIEW
+           MY RESOURCES VIEW (NESTED INSIDE A COURSE)
            ============================================================ */
         <div>
-          <div style={{ marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>Study Resources</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-              Upload actual study guides and slides to your public/private folders.
-            </p>
-          </div>
+          {!nestedMode && (
+            <div style={{ marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>Study Resources</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
+                Upload actual study guides and slides to your public/private folders.
+              </p>
+            </div>
+          )}
 
           <div className="timetable-split-layout">
             {/* File list card */}
             <div className="cohort-card nm-out" style={{ padding: '24px' }}>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
-                {['all', 'pdf', 'image', 'video'].map(cat => (
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', overflowX: 'auto' }}>
+                {['all', 'pdf', 'image', 'video', 'docx'].map(cat => (
                   <button
                     key={cat}
                     className={`pref-day-btn ${activeCategory === cat ? 'active' : ''}`}
@@ -239,7 +255,6 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        {/* Public / Private visibility eye toggle */}
                         <button
                           className="cohort-btn"
                           onClick={() => onToggleFileVisibility(file.id, !file.isPublic)}
@@ -312,20 +327,23 @@ export function Repository({ courses, files, userEmail, onAddFile, onDeleteFile,
                   />
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Linked Course</label>
-                  <select className="cohort-select" value={courseId} onChange={e => setCourseId(e.target.value)}>
-                    <option value="">None / General Reference</option>
-                    {courses.map(c => (
-                      <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
-                    ))}
-                  </select>
-                </div>
+                {!nestedMode && (
+                  <div className="form-group">
+                    <label className="form-label">Linked Course</label>
+                    <select className="cohort-select" value={courseId} onChange={e => setCourseId(e.target.value)}>
+                      <option value="">None / General Reference</option>
+                      {courses.map(c => (
+                        <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="form-group">
                   <label className="form-label">Detected Type</label>
                   <select className="cohort-select" value={fileType} onChange={e => setFileType(e.target.value)}>
                     <option value="pdf">PDF Document</option>
+                    <option value="docx">Word Document (.docx)</option>
                     <option value="image">Image/Graph</option>
                     <option value="video">Lecture Video</option>
                   </select>
