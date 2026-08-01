@@ -10,7 +10,22 @@ const getAuthHeaders = () => {
   };
 };
 
-// Generic REST API fetch wrapper
+const PROFILES_LOCAL_KEY = "estudy_profiles";
+
+const getLocalProfiles = () => {
+  try {
+    const raw = localStorage.getItem(PROFILES_LOCAL_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (_) {
+    return {};
+  }
+};
+
+const saveLocalProfile = (profile) => {
+  const all = getLocalProfiles();
+  all[profile.id || profile.email] = profile;
+  localStorage.setItem(PROFILES_LOCAL_KEY, JSON.stringify(all));
+};
 const apiFetch = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
   const response = await fetch(url, {
@@ -26,7 +41,7 @@ const apiFetch = async (endpoint, options = {}) => {
     try {
       const errData = await response.json();
       if (errData.message) errorMsg = errData.message;
-    } catch (_) {}
+    } catch (_) { }
     throw new Error(errorMsg);
   }
 
@@ -132,11 +147,21 @@ export const auth = {
     }
   },
 
-  async signOut() {
-    try {
-      await apiFetch("/auth/logout", { method: "POST" });
-    } catch (_) {}
+  signOut() {
+    const token = localStorage.getItem("estudy_token");
     this.notifyListeners(null);
+
+    try {
+      fetch(`${API_BASE_URL}/auth/logout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        keepalive: true
+      }).catch(() => { });
+    } catch (_) { }
+    return Promise.resolve();
   }
 };
 
@@ -178,29 +203,46 @@ export const DatabaseService = {
   async getProfile(email) {
     const emailKey = email.toLowerCase().trim();
     try {
-      return await apiFetch(`/profiles/${encodeURIComponent(emailKey)}`);
-    } catch (err) {
-      return {
-        id: emailKey,
-        email: emailKey,
-        name: emailKey.split("@")[0],
-        indexNumber: "",
-        reference: "",
-        year: "",
-        gender: "",
-        notificationsEnabled: true,
-        isPublic: true,
-        dailyDigestEnabled: true
-      };
+      const data = await apiFetch(`/profiles/${encodeURIComponent(emailKey)}`);
+      if (data && data.id) {
+        saveLocalProfile(data);
+      }
+      return data;
+    } catch (_) {
+      const all = getLocalProfiles();
+      return (
+        all[emailKey] || {
+          id: emailKey,
+          email: emailKey,
+          name: emailKey.split("@")[0],
+          indexNumber: "",
+          reference: "",
+          year: "",
+          gender: "",
+          notificationsEnabled: true,
+          isPublic: true,
+          dailyDigestEnabled: true
+        }
+      );
     }
   },
 
   async updateProfile(email, profileData) {
     const emailKey = email.toLowerCase().trim();
-    return await apiFetch(`/profiles/${encodeURIComponent(emailKey)}`, {
-      method: "PUT",
-      body: JSON.stringify(profileData)
-    });
+    try {
+      const data = await apiFetch(`/profiles/${encodeURIComponent(emailKey)}`, {
+        method: "PUT",
+        body: JSON.stringify(profileData)
+      });
+      if (data && (data.id || data.email)) {
+        saveLocalProfile(data);
+      }
+      return data;
+    } catch (_) {
+      const fallback = { ...profileData, id: emailKey, email: emailKey };
+      saveLocalProfile(fallback);
+      return fallback;
+    }
   },
 
   async getAllProfiles() {
@@ -296,8 +338,8 @@ export const DatabaseService = {
 
   async uploadFileToStorage(fileObj) {
     // Placeholder architecture endpoint for Spring Boot File Storage
-    const sizeStr = (fileObj.size < 1024 * 1024) 
-      ? (fileObj.size / 1024).toFixed(1) + " KB" 
+    const sizeStr = (fileObj.size < 1024 * 1024)
+      ? (fileObj.size / 1024).toFixed(1) + " KB"
       : (fileObj.size / (1024 * 1024)).toFixed(1) + " MB";
     return {
       publicUrl: `http://localhost:8080/uploads/${encodeURIComponent(fileObj.name)}`,
@@ -504,6 +546,41 @@ export const DatabaseService = {
     } catch (err) {
       return newAttempt;
     }
+  }
+};
+
+export const sendPasswordResetEmail = async (email) => {
+  const emailKey = (email || '').trim().toLowerCase();
+  if (!emailKey) {
+    throw new Error("Email address is required.");
+  }
+  try {
+    await apiFetch("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ email: emailKey })
+    });
+  } catch (err) {
+    console.warn("Password reset request warning:", err.message);
+    throw new Error(err.message || "Failed to send password reset email.");
+  }
+};
+
+export const confirmPasswordReset = async (token, newPassword) => {
+  const cleanToken = (token || '').trim();
+  if (!cleanToken) {
+    throw new Error("Reset token is required.");
+  }
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error("New password must be at least 6 characters.");
+  }
+  try {
+    await apiFetch("/auth/reset-password/confirm", {
+      method: "POST",
+      body: JSON.stringify({ token: cleanToken, newPassword })
+    });
+  } catch (err) {
+    console.warn("Password reset confirm warning:", err.message);
+    throw new Error(err.message || "Failed to reset password. The token may be invalid or expired.");
   }
 };
 

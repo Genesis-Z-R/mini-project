@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { CaretLeft, User } from '@phosphor-icons/react';
+
+const PROFILE_CACHE_KEY = 'estudy_profile_cache';
 
 export function Profile({ profile, onUpdateProfile, onBack }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -10,9 +12,57 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
   const [reference, setReference] = useState('');
   const [year, setYear] = useState('');
   const [gender, setGender] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const isInitialMount = useRef(true);
 
-  // Initialize fields with current profile values
+  const getCachedProfile = () => {
+    try {
+      const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+      if (raw) {
+        return JSON.parse(raw);
+      }
+    } catch (err) {
+      void err;
+    }
+    return null;
+  };
+
+  const setCachedProfile = (data) => {
+    try {
+      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(data));
+    } catch (err) {
+      void err;
+    }
+  };
+
+  const getSourceProfile = () => {
+    if (profile && (profile.name || profile.email || profile.indexNumber || profile.reference || profile.year || profile.gender)) {
+      return profile;
+    }
+    const cached = getCachedProfile();
+    if (cached && (cached.name || cached.email || cached.indexNumber || cached.reference || cached.year || cached.gender)) {
+      return cached;
+    }
+    return profile || cached || {};
+  };
+
+  const source = getSourceProfile();
+
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      if (source && (source.name || source.email)) {
+        setName(source.name || '');
+        setEmail(source.email || '');
+        setIndexNumber(source.indexNumber || '');
+        setReference(source.reference || '');
+        setYear(source.year || '');
+        setGender(source.gender || '');
+        return;
+      }
+    }
+
     if (profile) {
       setName(profile.name || '');
       setEmail(profile.email || '');
@@ -21,19 +71,38 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
       setYear(profile.year || '');
       setGender(profile.gender || '');
     }
-  }, [profile, isEditing]);
+  }, [profile, source]);
 
-  const handleSave = () => {
-    onUpdateProfile({
-      ...profile,
-      name: name.trim(),
-      email: email.trim(),
-      indexNumber: indexNumber.trim(),
-      reference: reference.trim(),
-      year,
-      gender
-    });
-    setIsEditing(false);
+  const buildUpdatedProfile = () => ({
+    ...getSourceProfile(),
+    name: name.trim(),
+    email: email.trim(),
+    indexNumber: indexNumber.trim(),
+    reference: reference.trim(),
+    year,
+    gender
+  });
+
+  const handleSave = async () => {
+    setSaveError('');
+    setIsSaving(true);
+    try {
+      const updated = buildUpdatedProfile();
+      await onUpdateProfile(updated);
+      setCachedProfile(updated);
+      setIsEditing(false);
+    } catch (err) {
+      setSaveError(err?.message || 'Failed to save changes');
+      const updated = buildUpdatedProfile();
+      setCachedProfile(updated);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleEdit = () => {
+    setSaveError('');
+    setIsEditing(true);
   };
 
   return (
@@ -42,15 +111,13 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
-      {/* Back Button */}
       <button className="back-arrow-btn" onClick={onBack} aria-label="Back" style={{ marginBottom: '16px' }}>
         <CaretLeft size={16} weight="bold" />
       </button>
 
       <div className="profile-card-container">
-        {/* Avatar badge */}
         <div className="profile-avatar-circle">
-          <User size={38} weight="bold" style={{ color: 'var(--accent)' }} />
+          <User size={38} weight="bold" style={{ color: 'var(--brand-blue)' }} />
         </div>
         
         {isEditing ? (
@@ -65,7 +132,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
             />
           </div>
         ) : (
-          <h2 className="profile-name-text">{profile.name}</h2>
+          <h2 className="profile-name-text">{source.name || profile.name || ''}</h2>
         )}
 
         {isEditing ? (
@@ -81,10 +148,9 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
             />
           </div>
         ) : (
-          <p className="profile-email-text">{profile.email}</p>
+          <p className="profile-email-text">{source.email || profile.email || ''}</p>
         )}
 
-        {/* Metadata Table */}
         <div className="profile-details-table" style={{ width: '100%' }}>
           <div className="profile-table-row">
             <span className="profile-row-label">Index Number</span>
@@ -98,7 +164,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 style={{ width: '180px', padding: '6px 12px', fontSize: '13px' }}
               />
             ) : (
-              <span className="profile-row-value">{profile.indexNumber || '—'}</span>
+              <span className="profile-row-value">{source.indexNumber || profile.indexNumber || '—'}</span>
             )}
           </div>
 
@@ -114,7 +180,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 style={{ width: '180px', padding: '6px 12px', fontSize: '13px' }}
               />
             ) : (
-              <span className="profile-row-value">{profile.reference || '—'}</span>
+              <span className="profile-row-value">{source.reference || profile.reference || '—'}</span>
             )}
           </div>
 
@@ -134,7 +200,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 <option value="Year 4">Year 4</option>
               </select>
             ) : (
-              <span className="profile-row-value">{profile.year || '—'}</span>
+              <span className="profile-row-value">{source.year || profile.year || '—'}</span>
             )}
           </div>
 
@@ -153,24 +219,38 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 <option value="—">—</option>
               </select>
             ) : (
-              <span className="profile-row-value">{profile.gender || '—'}</span>
+              <span className="profile-row-value">{source.gender || profile.gender || '—'}</span>
             )}
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {saveError && (
+          <div style={{ color: '#EF4444', fontSize: '12px', marginTop: '12px', textAlign: 'center' }}>
+            {saveError}
+          </div>
+        )}
+
         <div className="profile-buttons-stack" style={{ width: '100%', marginTop: '24px' }}>
           {isEditing ? (
             <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
-              <button className="cohort-btn cohort-btn-primary" onClick={handleSave} style={{ flex: 1, justifyContent: 'center' }}>
-                Save Changes
+              <button 
+                className="cohort-btn cohort-btn-primary" 
+                onClick={handleSave} 
+                disabled={isSaving}
+                style={{ flex: 1, justifyContent: 'center' }}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </button>
-              <button className="cohort-btn" onClick={() => setIsEditing(false)} style={{ flex: 1, justifyContent: 'center' }}>
+              <button 
+                className="cohort-btn" 
+                onClick={() => { setIsEditing(false); setSaveError(''); }}
+                style={{ flex: 1, justifyContent: 'center', padding: '8px', background: 'transparent', color: 'var(--brand-blue)', border: '2px solid var(--brand-blue)', fontWeight: '700', borderRadius: '8px' }}
+              >
                 Cancel
               </button>
             </div>
           ) : (
-            <button className="cohort-btn cohort-btn-primary" onClick={() => setIsEditing(true)} style={{ width: '100%', justifyContent: 'center' }}>
+            <button className="cohort-btn cohort-btn-primary" onClick={handleEdit} style={{ width: '100%', justifyContent: 'center' }}>
               Edit My Info
             </button>
           )}
@@ -179,4 +259,5 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
     </motion.div>
   );
 }
+
 export default Profile;
