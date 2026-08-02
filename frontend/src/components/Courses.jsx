@@ -202,8 +202,8 @@ export function Courses({
 
       {/* Add Course modal dialog */}
       {showAddModal && (
-        <div className="login-bg-overlay" style={{ zIndex: 1100 }}>
-          <div className="login-auth-card nm-out" style={{ maxWidth: '440px' }}>
+        <div className="quiz-modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="quiz-modal" style={{ maxWidth: '440px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '20px', textAlign: 'center' }}>
               Add New Course
             </h3>

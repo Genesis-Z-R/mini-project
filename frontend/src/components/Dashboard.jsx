@@ -2,11 +2,11 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { BookOpen, Calendar, Clock, Checks, Bell, Play, Square, Circle } from '@phosphor-icons/react';
 
-export function Dashboard({ 
-  schedule, 
-  files, 
-  courses, 
-  studySessions, 
+export function Dashboard({
+  schedule,
+  files,
+  courses,
+  studySessions,
   onSaveStudySession,
   onNavigate,
   profile
@@ -14,10 +14,33 @@ export function Dashboard({
   // Timer States
   const [timerActive, setTimerActive] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [showStopConfirm, setShowStopConfirm] = useState(false);
   const timerIntervalRef = useRef(null);
 
-  const todayString = new Date().toISOString().split('T')[0];
-  const currentDayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const [isDarkMode, setIsDarkMode] = useState(() => document.documentElement.getAttribute('data-theme') === 'dark');
+  useEffect(() => {
+    const update = () => setIsDarkMode(document.documentElement.getAttribute('data-theme') === 'dark');
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    window.addEventListener('storage', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('storage', update);
+    };
+  }, []);
+
+  const learningRingBaseColor = isDarkMode ? '#e2e8f0' : 'var(--bg-navigation)';
+  const learningRingProgressColor = isDarkMode ? '#2563eb' : 'var(--blue-ring, #3b82f6)';
+  const learningRingTextColor = isDarkMode ? '#1d4ed8' : 'var(--blue-ring, #3b82f6)';
+
+  const today = new Date();
+  const todayString = today.toISOString().split('T')[0];
+  const currentDayName = today.toLocaleDateString('en-US', { weekday: 'long' });
+  const currentDay = today.getDate();
+  const currentMonth = today.toLocaleDateString('en-US', { month: 'long' });
+  const currentYear = today.getFullYear();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
 
   // 1. Initialize and recover timer from localStorage
   useEffect(() => {
@@ -54,6 +77,7 @@ export function Dashboard({
   };
 
   const handleStopTimer = () => {
+    setShowStopConfirm(false);
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
@@ -67,9 +91,9 @@ export function Dashboard({
       const startTimeVal = parseInt(savedStart, 10);
       const seconds = Math.floor((Date.now() - startTimeVal) / 1000);
       const durationMin = Math.round(seconds / 60) || 1; // Minimum 1 minute
-      
+
       const formatTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-      
+
       onSaveStudySession({
         durationMinutes: durationMin,
         date: todayString,
@@ -98,7 +122,8 @@ export function Dashboard({
 
   // SVG Donut calculation (target 120 minutes = 100% stroke)
   const targetMinutes = 120;
-  const percentage = Math.min((totalTodayMinutes / targetMinutes) * 100, 100);
+  const liveTotalMinutes = totalTodayMinutes + (timerActive ? elapsedSeconds / 60 : 0);
+  const percentage = Math.min((liveTotalMinutes / targetMinutes) * 100, 100);
   const strokeDasharray = `${percentage} ${100 - percentage}`;
 
   // 3. Greeting formatting
@@ -177,7 +202,7 @@ export function Dashboard({
         const [startH, startM] = item.startTime.split(':').map(Number);
         const startTotalMin = startH * 60 + startM;
         const diff = startTotalMin - currentTotalMin;
-        
+
         // Starts in next 120 minutes and hasn't started yet
         if (diff > 0 && diff <= 120) {
           list.push({
@@ -215,72 +240,128 @@ export function Dashboard({
                 Hi {firstName}!
               </h2>
               <p style={{ fontSize: '13.5px', opacity: 0.9, lineHeight: '1.6' }}>
-                {todaysClasses.length > 0 
+                {todaysClasses.length > 0
                   ? `You have ${todaysClasses.length} class sessions scheduled for today. Start your learning now.`
                   : "You have no class sessions scheduled for today. Use the timer below to log your self-study time."}
               </p>
             </div>
-            {/* Inline student illustration vector */}
-            <svg className="welcome-banner-img" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="100" cy="100" r="80" fill="rgba(255,255,255,0.15)" />
-              <path d="M70 140 C 70 100, 130 100, 130 140 Z" fill="#ffffff" />
-              <circle cx="100" cy="75" r="22" fill="#ffffff" />
-              <rect x="75" y="110" width="50" height="24" rx="4" fill="#ffffff" stroke="#5E81F4" strokeWidth="3" />
-              <line x1="85" y1="122" x2="115" y2="122" stroke="#5E81F4" strokeWidth="2" />
+            {/* Student illustration SVG */}
+            <svg className="welcome-banner-img" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* Blue circle background */}
+              <circle cx="70" cy="70" r="70" fill="rgba(255,255,255,0.18)" />
+              {/* Head */}
+              <circle cx="70" cy="62" r="20" fill="white" />
+              {/* Body / shoulders */}
+              <path d="M30 120 C30 88 110 88 110 120 Z" fill="white" />
+              {/* Graduation cap board */}
+              <rect x="44" y="42" width="52" height="8" rx="2" fill="white" />
+              {/* Cap top */}
+              <polygon points="70,28 100,42 70,48 40,42" fill="white" />
+              {/* Cap tassel */}
+              <line x1="100" y1="42" x2="104" y2="56" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
+              <circle cx="104" cy="59" r="3" fill="white" />
             </svg>
           </div>
 
           {/* Two-Column Middle widgets: Learning Time & Daily Schedule */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '28px' }}>
-            
+
             {/* Learning Time Interactive Donut & Stopwatch */}
-            <div className="cohort-card nm-out" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justify: 'space-between' }}>
+            <div
+              className="cohort-card nm-out dashboard-widget-learning-timer"
+              style={{
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                justify: 'space-between',
+                background: isDarkMode ? '#ffffff' : '#dbeafe',
+                border: isDarkMode ? '1px solid rgba(15, 23, 42, 0.08)' : 'none',
+                boxShadow: isDarkMode ? '0 8px 30px rgba(0, 0, 0, 0.35)' : '0 4px 20px rgba(59, 130, 246, 0.18)'
+              }}
+            >
               <div>
-                <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px' }}>Learning Timer</h3>
-                
+                <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: '#1e40af' }}>Learning Timer</h3>
+
                 <div style={{ display: 'flex', alignItems: 'center', justify: 'space-between', gap: '16px' }}>
                   {/* Donut chart */}
                   <div className="donut-chart-container" style={{ margin: 0 }}>
                     <svg width="100" height="100" viewBox="0 0 42 42">
-                      <circle cx="21" cy="21" r="15.915" fill="transparent" stroke="var(--bg-navigation)" strokeWidth="4"></circle>
-                      <circle 
-                        cx="21" 
-                        cy="21" 
-                        r="15.915" 
-                        fill="transparent" 
-                        stroke="var(--accent)" 
-                        strokeWidth="4" 
-                        strokeDasharray={strokeDasharray} 
+                      <circle cx="21" cy="21" r="15.915" fill="transparent" stroke={learningRingBaseColor} strokeWidth="4"></circle>
+                      <circle
+                        cx="21"
+                        cy="21"
+                        r="15.915"
+                        fill="transparent"
+                        stroke={learningRingProgressColor}
+                        strokeWidth="4"
+                        strokeDasharray={strokeDasharray}
                         strokeDashoffset="25"
-                        style={{ transition: 'stroke-dasharray 0.5s ease' }}
+                        style={{
+                          transition: 'stroke-dasharray 1s linear',
+                          transformOrigin: 'center'
+                        }}
                       ></circle>
                     </svg>
                     <div className="donut-chart-center">
-                      <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
-                        {Math.floor(totalTodayMinutes / 60)}h {totalTodayMinutes % 60}m
+                      <strong style={{ fontSize: '13px', color: learningRingTextColor }}>
+                        {Math.floor(liveTotalMinutes / 60)}h {Math.floor(liveTotalMinutes % 60)}m
                       </strong>
-                      <span style={{ fontSize: '8px', color: 'var(--text-tertiary)' }}>Today</span>
+                      <span style={{ fontSize: '8px', color: isDarkMode ? '#475569' : 'var(--text-tertiary)' }}>Today</span>
                     </div>
                   </div>
 
                   {/* Stopwatch controls */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                    <div style={{ fontSize: '22px', fontWeight: '800', fontFamily: 'monospace', color: timerActive ? 'var(--accent)' : 'var(--text-primary)', textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: '800', fontFamily: 'monospace', color: learningRingTextColor, textAlign: 'center' }}>
                       {formatTimerString(elapsedSeconds)}
                     </div>
                     {timerActive ? (
-                      <button 
-                        onClick={handleStopTimer}
-                        className="cohort-btn" 
-                        style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)', width: '100%', justify: 'center', gap: '6px' }}
-                      >
-                        <Square size={12} weight="fill" />
-                        <span>Stop Session</span>
-                      </button>
+                      <div style={{ position: 'relative', width: '100%' }}>
+                        <button
+                          onClick={() => setShowStopConfirm(true)}
+                          className="cohort-btn"
+                          style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)', width: '100%', justify: 'center', gap: '6px' }}
+                        >
+                          <Square size={12} weight="fill" />
+                          <span>Stop Session</span>
+                        </button>
+                        {showStopConfirm && (
+                          <div
+                            onClick={() => setShowStopConfirm(false)}
+                            style={{
+                              position: 'fixed', inset: 0,
+                              background: 'rgba(0,0,0,0.35)',
+                              backdropFilter: 'blur(6px)',
+                              WebkitBackdropFilter: 'blur(6px)',
+                              zIndex: 9999,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}
+                          >
+                            <div
+                              onClick={e => e.stopPropagation()}
+                              style={{
+                                background: '#ffffff',
+                                border: '1px solid #e2e8f0',
+                                borderRadius: '14px',
+                                padding: '28px 32px',
+                                boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
+                                textAlign: 'center',
+                                minWidth: '240px',
+                              }}
+                            >
+                              <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '16px', color: '#0f172a' }}>End session?</div>
+                              <div style={{ display: 'flex', gap: '10px' }}>
+                                <button onClick={handleStopTimer} className="cohort-btn confirm-btn-yes" style={{ flex: 1, justifyContent: 'center', padding: '8px', background: '#15803d', color: '#ffffff', fontWeight: '700', border: 'none', borderRadius: '8px' }}>Yes</button>
+                                <button onClick={() => setShowStopConfirm(false)} className="cohort-btn confirm-btn-no" style={{ flex: 1, justifyContent: 'center', padding: '8px', background: '#b91c1c', color: '#ffffff', fontWeight: '700', border: 'none', borderRadius: '8px' }}>No</button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     ) : (
-                      <button 
+                      <button
                         onClick={handleStartTimer}
-                        className="cohort-btn cohort-btn-primary" 
+                        className="cohort-btn cohort-btn-primary"
                         style={{ width: '100%', justify: 'center', gap: '6px' }}
                       >
                         <Play size={12} weight="fill" />
@@ -292,23 +373,31 @@ export function Dashboard({
               </div>
 
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '12px' }}>
-                {todaysSessions.length > 0 
+                {todaysSessions.length > 0
                   ? `Completed ${todaysSessions.length} study session(s) today.`
                   : "No study periods logged yet. Start learning today!"}
               </div>
             </div>
 
             {/* Daily Schedule Ticker */}
-            <div className="cohort-card nm-out" style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', justify: 'space-between' }}>
+            <div
+              className="cohort-card nm-out dashboard-widget-todays-classes"
+              style={{
+                padding: '24px',
+                background: isDarkMode ? '#ffffff' : '#dbeafe',
+                border: isDarkMode ? '1px solid rgba(15, 23, 42, 0.08)' : 'none',
+                boxShadow: isDarkMode ? '0 8px 30px rgba(0, 0, 0, 0.35)' : '0 4px 20px rgba(59, 130, 246, 0.18)'
+              }}
+            >
+              <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'baseline', gap: '8px', color: '#1e40af' }}>
                 <span>Today's Classes</span>
-                <span style={{ fontSize: '11px', fontWeight: '500', color: 'var(--text-tertiary)' }}>{currentDayName}</span>
+                <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#1e40af' }}>{currentDayName}</span>
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '160px', overflowY: 'auto' }}>
                 {todaysClasses.length > 0 ? (
                   todaysClasses.map(item => (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: 'var(--bg-navigation)', borderRadius: '8px' }}>
-                      <Clock size={16} style={{ color: 'var(--accent)' }} />
+                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: 'rgba(59,130,246,0.08)', borderRadius: '8px' }}>
+                      <Clock size={16} style={{ color: '#3b82f6' }} />
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontSize: '12.5px', fontWeight: '700' }}>{item.name}</span>
                         <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{item.startTime} - {item.endTime} | {item.room}</span>
@@ -329,20 +418,43 @@ export function Dashboard({
            RIGHT COLUMN: Widget sidebar
            ========================================== */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          
+
           {/* Calendar Picker Widget */}
-          <div className="cohort-card nm-out" style={{ padding: '20px' }}>
+          <div className="cohort-card nm-out" style={{
+            padding: '20px',
+            background: '#f0fdf4',
+            boxShadow: '0 4px 20px rgba(34, 197, 94, 0.10)',
+          }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <span style={{ fontSize: '13.5px', fontWeight: '800' }}>July 2026</span>
+              <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#166534' }}>{currentMonth} {currentYear}</span>
             </div>
             {/* Simple calendar numbers grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', fontSize: '11px', fontWeight: '600' }}>
-              {['S','M','T','W','T','F','S'].map((d, i) => <div key={i} style={{ color: 'var(--text-tertiary)' }}>{d}</div>)}
-              {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
-                <div 
-                  key={day} 
-                  className={`pref-day-btn ${day === 15 ? 'active' : ''}`}
-                  style={{ padding: '6px', fontSize: '11px', border: 'none', background: 'transparent' }}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', fontSize: '15px', fontWeight: '600' }}>
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                <div key={i} style={{ color: '#4ade80', fontWeight: '700', fontSize: '10px', marginBottom: '2px' }}>{d}</div>
+              ))}
+              {Array.from({ length: new Date(today.getFullYear(), today.getMonth(), 1).getDay() }, (_, i) => (
+                <div key={`empty-${i}`} style={{ padding: '6px', fontSize: '11px' }} />
+              ))}
+              {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => (
+                <div
+                  key={day}
+                  className={`pref-day-btn ${day === currentDay ? 'cohort-btn-primary' : ''}`}
+                  style={{
+                    padding: '6px',
+                    fontSize: '11px',
+                    border: 'none',
+                    background: day === currentDay ? '#86efac' : 'transparent',
+                    color: day === currentDay ? '#14532d' : '#374151',
+                    borderRadius: '50%',
+                    fontWeight: day === currentDay ? '800' : 'normal',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '26px',
+                    height: '26px',
+                    margin: '0 auto',
+                  }}
                 >
                   {day}
                 </div>
@@ -351,15 +463,15 @@ export function Dashboard({
           </div>
 
           {/* Upcoming Tasks (Non-class events like meetings, tasks) */}
-          <div className="cohort-card nm-out" style={{ padding: '24px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px' }}>Upcoming Tasks</h3>
+          <div className="cohort-card nm-out" style={{ padding: '24px', background: '#f0fdf4', boxShadow: '0 4px 20px rgba(34, 197, 94, 0.10)' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: '#166534' }}>Upcoming Tasks</h3>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '200px', overflowY: 'auto' }}>
               {upcomingTasks.length > 0 ? (
                 upcomingTasks.map(task => (
-                  <div key={task.id} style={{ display: 'flex', justify: 'space-between', alignItems: 'center', padding: '10px', background: 'var(--bg-navigation)', borderRadius: '8px' }}>
+                  <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(34,197,94,0.08)', borderRadius: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Circle size={8} weight="fill" style={{ color: 'var(--accent)' }} />
+                      <Circle size={8} weight="fill" style={{ color: '#22c55e' }} />
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
                         <span style={{ fontSize: '12.5px', fontWeight: '700' }}>{task.name}</span>
                         <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -378,21 +490,21 @@ export function Dashboard({
           </div>
 
           {/* Dynamic Reminders */}
-          <div className="cohort-card nm-out" style={{ padding: '20px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Bell size={16} />
+          <div className="cohort-card nm-out" style={{ padding: '20px', background: '#f0fdf4', boxShadow: '0 4px 20px rgba(34, 197, 94, 0.10)' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px', color: '#166534' }}>
+              <Bell size={16} style={{ color: '#22c55e' }} />
               Reminders
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px' }}>
               {reminders.length > 0 ? (
                 reminders.map(rem => (
-                  <div 
-                    key={rem.id} 
-                    style={{ 
-                      padding: '8px 12px', 
-                      background: rem.isClass ? 'rgba(63, 195, 128, 0.06)' : 'rgba(94, 129, 244, 0.06)', 
-                      borderLeft: `3px solid ${rem.isClass ? '#3FC380' : '#5E81F4'}`, 
-                      borderRadius: '6px' 
+                  <div
+                    key={rem.id}
+                    style={{
+                      padding: '8px 12px',
+                      background: rem.isClass ? 'rgba(63, 195, 128, 0.06)' : 'rgba(94, 129, 244, 0.06)',
+                      borderLeft: `3px solid ${rem.isClass ? '#3FC380' : '#5E81F4'}`,
+                      borderRadius: '6px'
                     }}
                   >
                     <strong>{rem.name} Starting Soon</strong>

@@ -10,7 +10,7 @@ import { Setting } from './components/Setting';
 import { Peers } from './components/Peers';
 import { Courses } from './components/Courses';
 import { auth, DatabaseService, onAuthStateChanged, signOut } from './utils/db';
-import { Warning, List, User } from '@phosphor-icons/react';
+import { List, User } from '@phosphor-icons/react';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -28,7 +28,7 @@ function App() {
   const [friendships, setFriendships] = useState([]);
   const [quizAttempts, setQuizAttempts] = useState([]);
   const [profile, setProfile] = useState({
-    name: 'Student',
+    name: '',
     email: '',
     indexNumber: '',
     reference: '',
@@ -114,14 +114,50 @@ function App() {
       setQuizzes([]);
       setFriendships([]);
       setQuizAttempts([]);
+      setProfile({
+        name: '',
+        email: '',
+        indexNumber: '',
+        reference: '',
+        year: '',
+        gender: '',
+        notificationsEnabled: true,
+        isPublic: true,
+        dailyDigestEnabled: true
+      });
       return;
     }
     const emailKey = currentUser.email.toLowerCase().trim();
     refreshAllData(emailKey);
   }, [currentUser]);
 
-  const handleSignOut = () => {
-    signOut(auth);
+  const handleSignOut = async () => {
+    localStorage.removeItem('estudy_user');
+    localStorage.removeItem('estudy_token');
+    setCurrentUser(null);
+    setAuthChecking(false);
+    setCourses([]);
+    setSchedule([]);
+    setFiles([]);
+    setGroups([]);
+    setStudySessions([]);
+    setQuizzes([]);
+    setFriendships([]);
+    setQuizAttempts([]);
+    setProfile({
+      name: '',
+      email: '',
+      indexNumber: '',
+      reference: '',
+      year: '',
+      gender: '',
+      notificationsEnabled: true,
+      isPublic: true,
+      dailyDigestEnabled: true
+    });
+    try {
+      void signOut(auth);
+    } catch (_) { }
   };
 
   const handleLoginSuccess = (user) => {
@@ -231,11 +267,8 @@ function App() {
     return <Login onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // Profile fields check to show warning alert
-  const isProfileIncomplete = !profile?.indexNumber || !profile?.reference || !profile?.year || !profile?.gender;
-
-  const renderPanel = () => {
-    switch (activeTab) {
+   const renderPanel = () => {
+     switch (activeTab) {
       case 'dashboard':
         return (
           <Dashboard 
@@ -373,14 +406,6 @@ function App() {
         className={isMobileMenuOpen ? 'mobile-open' : ''}
       />
       <main className="estudy-workspace">
-        {isProfileIncomplete && (
-          <div className="alert-box" style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Warning size={18} weight="bold" style={{ flexShrink: 0 }} />
-            <span style={{ fontSize: '13px', fontWeight: '700' }}>
-              ⚠️ Please complete your profile details (Index Number, Reference Number, Year, Gender) in the Profile tab to enable your full academic companion credentials.
-            </span>
-          </div>
-        )}
         {renderPanel()}
       </main>
     </div>
