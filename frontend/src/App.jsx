@@ -9,6 +9,7 @@ import { Profile } from './components/Profile';
 import { Setting } from './components/Setting';
 import { Peers } from './components/Peers';
 import { Courses } from './components/Courses';
+import { Groups } from './components/Groups';
 import { auth, DatabaseService, onAuthStateChanged, signOut } from './utils/db';
 import { List, User } from '@phosphor-icons/react';
 

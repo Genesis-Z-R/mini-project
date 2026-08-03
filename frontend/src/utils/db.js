@@ -416,7 +416,20 @@ export const DatabaseService = {
   async getQuizzes(userId) {
     try {
       const data = await apiFetch(`/quizzes?userId=${encodeURIComponent(userId)}`);
-      return data || [];
+      return (data || []).map(quiz => {
+        let questions = quiz.questions;
+        if (!questions && quiz.questionsJson) {
+          try {
+            questions = typeof quiz.questionsJson === 'string' ? JSON.parse(quiz.questionsJson) : quiz.questionsJson;
+          } catch (_) {
+            questions = [];
+          }
+        }
+        return {
+          ...quiz,
+          questions: questions || []
+        };
+      });
     } catch (err) {
       return [];
     }
@@ -424,14 +437,22 @@ export const DatabaseService = {
 
   async addQuiz(quiz) {
     const id = "q_" + Date.now();
-    const newQuiz = { ...quiz, id };
+    const questionsJson = typeof quiz.questions === 'object' ? JSON.stringify(quiz.questions) : (quiz.questionsJson || '[]');
+    const newQuiz = { ...quiz, id, questionsJson };
     try {
-      return await apiFetch("/quizzes", {
+      const res = await apiFetch("/quizzes", {
         method: "POST",
         body: JSON.stringify(newQuiz)
       });
+      return {
+        ...(res || newQuiz),
+        questions: quiz.questions || []
+      };
     } catch (err) {
-      return newQuiz;
+      return {
+        ...newQuiz,
+        questions: quiz.questions || []
+      };
     }
   },
 

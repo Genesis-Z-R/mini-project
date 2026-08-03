@@ -1,0 +1,165 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Profile {
+  id                   String        @id
+  email                String        @unique
+  passwordHash         String?
+  name                 String
+  indexNumber          String?
+  reference            String?
+  year                 String?
+  gender               String?
+  notificationsEnabled Boolean       @default(true)
+  isPublic             Boolean       @default(true)
+  dailyDigestEnabled   Boolean       @default(true)
+  resetToken           String?
+  resetTokenExpiry     DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  courses              Course[]
+  files                FileMetadata[]
+  quizzes              Quiz[]
+  quizAttempts         QuizAttempt[]
+  schedules            Schedule[]
+  studySessions        StudySession[]
+  sentFriendships      Friendship[]  @relation("SentFriendships")
+  receivedFriendships  Friendship[]  @relation("ReceivedFriendships")
+
+  @@map("profiles")
+}
+
+model Course {
+  id        String   @id
+  name      String
+  code      String
+  room      String?
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, code])
+  @@index([userId])
+  @@map("courses")
+}
+
+model FileMetadata {
+  id         String   @id
+  title      String
+  courseId   String?  @default("none")
+  fileType   String
+  size       String
+  downloads  Int      @default(0)
+  isPublic   Boolean  @default(true)
+  uploadDate String
+  userId     String
+  url        String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user       Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isPublic])
+  @@index([title])
+  @@map("files")
+}
+
+model Friendship {
+  id         String   @id
+  senderId   String
+  receiverId String
+  status     String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sender     Profile  @relation("SentFriendships", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   Profile  @relation("ReceivedFriendships", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@map("friendships")
+}
+
+model Quiz {
+  id            String        @id
+  courseId      String?
+  courseName    String?
+  title         String
+  questionCount Int           @default(0)
+  type          String?
+  questionsJson String
+  userId        String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  user          Profile       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempts      QuizAttempt[]
+
+  @@index([userId])
+  @@map("quizzes")
+}
+
+model QuizAttempt {
+  id          String   @id
+  quizId      String
+  userId      String
+  score       Float
+  maxScore    Float
+  attemptDate String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  quiz        Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user        Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([quizId])
+  @@map("quiz_attempts")
+}
+
+model Schedule {
+  id              String   @id
+  courseId        String?
+  name            String
+  day             String
+  startTime       String
+  endTime         String
+  room            String?
+  isRepeating     Boolean  @default(true)
+  repeatFrequency String   @default("weekly")
+  isClass         Boolean  @default(true)
+  userId          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, day])
+  @@map("schedule")
+}
+
+model StudySession {
+  id              String   @id
+  durationMinutes Int
+  date            String
+  startTime       String?
+  endTime         String?
+  userId          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("study_sessions")
+}
