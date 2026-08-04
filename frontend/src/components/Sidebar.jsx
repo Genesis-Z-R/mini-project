@@ -7,10 +7,10 @@ export function Sidebar({ currentTab, setCurrentTab, user, onSignOut, className 
     { id: 'dashboard', label: 'Dashboard', icon: SquaresFour },
     { id: 'courses', label: 'My Courses', icon: GraduationCap },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
-    { id: 'peers', label: 'Peers', icon: UsersThree },
+    { id: 'peers', label: 'Find Peers', icon: UsersThree },
     { id: 'global_search', label: 'Global Search', icon: Globe },
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'setting', label: 'Setting', icon: Gear }
+    { id: 'setting', label: 'Settings', icon: Gear }
   ];
 
   return (

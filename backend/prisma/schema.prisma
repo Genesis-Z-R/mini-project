@@ -8,32 +8,77 @@ generator client {
 }
 
 model Profile {
-  id                   String        @id
-  email                String        @unique
-  passwordHash         String?
-  name                 String
-  indexNumber          String?
-  reference            String?
-  year                 String?
-  gender               String?
-  notificationsEnabled Boolean       @default(true)
-  isPublic             Boolean       @default(true)
-  dailyDigestEnabled   Boolean       @default(true)
-  resetToken           String?
-  resetTokenExpiry     DateTime?
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  id                                 String        @id
+  email                              String        @unique
+  passwordHash                       String?
+  name                               String
+  indexNumber                        String?
+  reference                          String?
+  year                               String?
+  gender                             String?
+  programmeId                        String?
+  programmeName                      String?
+  notificationsEnabled               Boolean       @default(true)
+  isPublic                           Boolean       @default(true)
+  dailyDigestEnabled                 Boolean       @default(true)
+  isDarkMode                         Boolean       @default(false)
+  publicResourceDirectoryEnabled     Boolean       @default(true)
+  publicProfileEnabled               Boolean       @default(true)
+  pushNotificationsMaster            Boolean       @default(true)
+  classRemindersEnabled              Boolean       @default(true)
+  studySessionRemindersEnabled       Boolean       @default(true)
+  eventRemindersEnabled              Boolean       @default(true)
+  friendRequestReceivedEnabled       Boolean       @default(true)
+  friendRequestAcceptedEnabled       Boolean       @default(true)
+  friendResourceUploadEnabled       Boolean       @default(true)
+  friendCourseResourceUploadEnabled Boolean       @default(true)
+  resetToken                         String?
+  resetTokenExpiry                   DateTime?
+  createdAt                          DateTime      @default(now())
+  updatedAt                          DateTime      @updatedAt
 
-  courses              Course[]
-  files                FileMetadata[]
-  quizzes              Quiz[]
-  quizAttempts         QuizAttempt[]
-  schedules            Schedule[]
-  studySessions        StudySession[]
-  sentFriendships      Friendship[]  @relation("SentFriendships")
-  receivedFriendships  Friendship[]  @relation("ReceivedFriendships")
+  programme                          Programme?    @relation(fields: [programmeId], references: [id], onDelete: SetNull)
+  courses                            Course[]
+  files                              FileMetadata[]
+  quizzes                            Quiz[]
+  quizAttempts                       QuizAttempt[]
+  schedules                          Schedule[]
+  studySessions                      StudySession[]
+  sentFriendships                    Friendship[]  @relation("SentFriendships")
+  receivedFriendships                Friendship[]  @relation("ReceivedFriendships")
+  notifications                      Notification[]
 
   @@map("profiles")
+}
+
+model Notification {
+  id        String   @id
+  userId    String
+  type      String
+  title     String
+  message   String
+  link      String?
+  relatedId String?
+  priority  String   @default("MEDIUM")
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      Profile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model Programme {
+  id             String    @id
+  name           String
+  normalizedName String    @unique
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  profiles       Profile[]
+
+  @@map("programmes")
 }
 
 model Course {
@@ -138,6 +183,8 @@ model Schedule {
   isRepeating     Boolean  @default(true)
   repeatFrequency String   @default("weekly")
   isClass         Boolean  @default(true)
+  scheduleType    String   @default("CLASS")
+  customCategory  String?
   userId          String
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

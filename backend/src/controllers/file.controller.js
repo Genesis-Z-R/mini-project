@@ -36,7 +36,14 @@ export const FileController = {
   async searchPublicFiles(req, res, next) {
     try {
       const query = req.query.query || '';
-      const files = await FileService.searchPublicFiles(query);
+      const userId = req.query.userId || (req.user ? req.user.email : '');
+      const filters = {
+        programmeOnly: req.query.programmeOnly === 'true',
+        sameCourseOnly: req.query.sameCourseOnly === 'true',
+        fileType: req.query.fileType || '',
+        recentOnly: req.query.recentOnly === 'true'
+      };
+      const files = await FileService.searchPublicFiles(query, userId, filters);
       return res.status(200).json(files);
     } catch (err) {
       return res.status(500).json({ success: false, message: err.message });

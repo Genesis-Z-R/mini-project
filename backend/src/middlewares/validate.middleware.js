@@ -4,6 +4,6 @@ export const validate = (schema, target = 'body') => (req, res, next) => {
     next();
   } catch (err) {
     const message = err.errors ? err.errors.map(e => e.message).join(', ') : 'Validation error';
-    return res.status(400).json({ success: false, message });
+    return res.status(400).json({ message });
   }
 };

@@ -17,6 +17,9 @@ export const ScheduleService = {
     }
 
     const id = item.id || `s_${Date.now()}`;
+    const scheduleType = item.scheduleType || (item.isClass ? 'CLASS' : 'PERSONAL_EVENT');
+    const isClass = scheduleType === 'CLASS';
+
     return await prisma.schedule.upsert({
       where: { id },
       update: {
@@ -28,7 +31,9 @@ export const ScheduleService = {
         room: item.room,
         isRepeating: item.isRepeating ?? true,
         repeatFrequency: item.repeatFrequency || 'weekly',
-        isClass: item.isClass ?? true,
+        isClass,
+        scheduleType,
+        customCategory: item.customCategory || null,
         userId
       },
       create: {
@@ -41,7 +46,9 @@ export const ScheduleService = {
         room: item.room,
         isRepeating: item.isRepeating ?? true,
         repeatFrequency: item.repeatFrequency || 'weekly',
-        isClass: item.isClass ?? true,
+        isClass,
+        scheduleType,
+        customCategory: item.customCategory || null,
         userId
       }
     });
@@ -49,6 +56,14 @@ export const ScheduleService = {
 
   async updateSchedule(id, item) {
     const userId = item.userId ? item.userId.trim().toLowerCase() : undefined;
+    const scheduleType = item.scheduleType !== undefined
+      ? item.scheduleType
+      : item.isClass !== undefined
+        ? (item.isClass ? 'CLASS' : 'PERSONAL_EVENT')
+        : undefined;
+
+    const isClass = scheduleType !== undefined ? (scheduleType === 'CLASS') : item.isClass;
+
     return await prisma.schedule.update({
       where: { id },
       data: {
@@ -60,7 +75,9 @@ export const ScheduleService = {
         ...(item.room !== undefined && { room: item.room }),
         ...(item.isRepeating !== undefined && { isRepeating: item.isRepeating }),
         ...(item.repeatFrequency !== undefined && { repeatFrequency: item.repeatFrequency }),
-        ...(item.isClass !== undefined && { isClass: item.isClass }),
+        ...(isClass !== undefined && { isClass }),
+        ...(scheduleType !== undefined && { scheduleType }),
+        ...(item.customCategory !== undefined && { customCategory: item.customCategory }),
         ...(userId && { userId })
       }
     });

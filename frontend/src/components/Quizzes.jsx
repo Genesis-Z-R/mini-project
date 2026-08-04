@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { 
-  Plus, Trash, Warning, CheckCircle, Copy, Play, ArrowLeft, ArrowRight, ArrowCounterClockwise, Star, Trophy, Sparkle 
+  Plus, Trash, Warning, CheckCircle, Copy, Play, ArrowLeft, ArrowRight, ArrowCounterClockwise, Star, Trophy, Sparkle, ListChecks 
 } from '@phosphor-icons/react';
 
 export function Quizzes({ courses, quizzes, quizAttempts, onCreateQuiz, onDeleteQuiz, onSaveAttempt }) {
@@ -448,11 +448,11 @@ export function Quizzes({ courses, quizzes, quizAttempts, onCreateQuiz, onDelete
            LIST AND ADD VIEW (NESTED INSIDE A COURSE)
            ============================================================ */
         <div>
-          <div style={{ display: 'flex', justify: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-            <h3 style={{ fontSize: '16px', fontWeight: '800' }}>Subject Quizzes</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>Subject Quizzes</h3>
             
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={handleCopyPrompt} className="cohort-btn" style={{ gap: '6px', fontSize: '12px' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <button onClick={handleCopyPrompt} className="cohort-btn" style={{ gap: '6px', fontSize: '12px', padding: '8px 14px' }}>
                 <Copy size={14} />
                 <span>Copy AI Quiz Prompt</span>
               </button>
@@ -460,7 +460,7 @@ export function Quizzes({ courses, quizzes, quizAttempts, onCreateQuiz, onDelete
               <button 
                 onClick={() => setShowAddModal(true)}
                 className="cohort-btn cohort-btn-primary"
-                style={{ gap: '6px', fontSize: '12px' }}
+                style={{ gap: '6px', fontSize: '12px', padding: '8px 14px' }}
               >
                 <Plus size={14} weight="bold" />
                 <span>Paste AI Generated Quiz</span>
@@ -478,65 +478,73 @@ export function Quizzes({ courses, quizzes, quizAttempts, onCreateQuiz, onDelete
                   .sort((a, b) => b.id.localeCompare(a.id)); // Newest first
 
                 return (
-                  <div key={quiz.id} className="cohort-card nm-out" style={{ padding: '24px', display: 'flex', justify: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                        <span style={{ background: 'var(--badge-blue-bg)', color: 'var(--badge-blue-text)', fontSize: '9px', fontWeight: 'bold', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase' }}>
-                          {quiz.type}
-                        </span>
-                        <h4 style={{ fontSize: '15px', fontWeight: '800' }}>{quiz.title}</h4>
+                  <div key={quiz.id} className="cohort-card nm-out" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '42px', height: '42px', borderRadius: '10px', background: 'var(--bg-surface)', color: 'var(--accent)', flexShrink: 0, border: '1px solid var(--border-color)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}>
+                        <ListChecks size={22} weight="bold" />
                       </div>
-                      <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{quiz.questionCount} Questions</span>
-                      
-                      {/* Attempts Score History */}
-                      <div style={{ marginTop: '14px', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
-                        <strong style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                          Attempts & Marks History:
-                        </strong>
-                        {attempts.length > 0 ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {attempts.map((att, index) => (
-                              <span 
-                                key={att.id} 
-                                style={{ 
-                                  fontSize: '10.5px', 
-                                  background: 'var(--bg-navigation)', 
-                                  padding: '4px 8px', 
-                                  borderRadius: '6px', 
-                                  color: att.score === att.maxScore ? 'var(--accent)' : 'var(--text-primary)' 
-                                }}
-                              >
-                                Run {attempts.length - index}: {att.score}/{att.maxScore} ({att.attemptDate})
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
-                            No attempts recorded yet. Click "Start Quiz" to take your first run.
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                          <span style={{ background: 'var(--badge-blue-bg)', color: 'var(--badge-blue-text)', fontSize: '10px', fontWeight: 'bold', padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>
+                            {quiz.type}
                           </span>
-                        )}
+                          <h4 style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-primary)', margin: 0 }}>{quiz.title}</h4>
+                        </div>
+                        <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>{quiz.questionCount} Questions</span>
+                        
+                        {/* Attempts Score History */}
+                        <div style={{ marginTop: '12px', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+                          <strong style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
+                            Attempts & Marks History:
+                          </strong>
+                          {attempts.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                              {attempts.map((att, index) => (
+                                <span 
+                                  key={att.id} 
+                                  style={{ 
+                                    fontSize: '11px', 
+                                    background: 'var(--bg-navigation)', 
+                                    padding: '4px 10px', 
+                                    borderRadius: '6px', 
+                                    fontWeight: '600',
+                                    color: att.score === att.maxScore ? 'var(--accent)' : 'var(--text-primary)',
+                                    border: '1px solid var(--border-color)'
+                                  }}
+                                >
+                                  Run {attempts.length - index}: {att.score}/{att.maxScore} ({att.attemptDate})
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
+                              No attempts recorded yet. Click "Start Quiz" to take your first run.
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px', marginLeft: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                       <button 
                         className="cohort-btn cohort-btn-primary" 
                         onClick={() => handleStartQuiz(quiz)}
-                        style={{ gap: '4px', fontSize: '12px' }}
+                        style={{ gap: '6px', fontSize: '12.5px', padding: '8px 16px', fontWeight: '700' }}
                       >
-                        <Play size={12} weight="fill" />
-                        Start Quiz
+                        <Play size={14} weight="fill" />
+                        <span>Start Quiz</span>
                       </button>
                       <button 
-                        className="cohort-btn" 
+                        className="icon-action-btn danger" 
                         onClick={() => {
                           if (confirm(`Delete quiz "${quiz.title}" and erase its attempt history?`)) {
                             onDeleteQuiz(quiz.id);
                           }
                         }}
-                        style={{ padding: '8px' }}
+                        title="Delete quiz"
                       >
-                        <Trash size={14} style={{ color: '#EF4444' }} />
+                        <Trash size={16} style={{ color: 'var(--text-tertiary)' }} />
                       </button>
                     </div>
                   </div>

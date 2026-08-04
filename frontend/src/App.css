@@ -1140,14 +1140,18 @@ button.start-quiz-link:not(:disabled):hover span {
 .timetable-toggle-container {
   display: flex;
   justify-content: center;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .timetable-toggle-bar {
   background: var(--bg-navigation);
-  border-radius: 99px;
-  padding: 4px;
-  display: flex;
+  border-radius: 999px;
+  padding: 5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
 .timetable-toggle-btn {
@@ -1156,26 +1160,90 @@ button.start-quiz-link:not(:disabled):hover span {
   outline: none;
   font-family: var(--font-sans);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-secondary);
-  padding: 6px 16px;
-  border-radius: 99px;
+  padding: 8px 18px;
+  border-radius: 999px;
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-smooth);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
 }
 
 .timetable-toggle-btn:hover {
-  color: var(--brand-blue);
+  color: var(--accent);
+  background: rgba(37, 99, 235, 0.06);
 }
 
 .timetable-toggle-btn.active {
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  box-shadow: var(--shadow-sm);
+  background: var(--accent) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
 
-.timetable-toggle-btn.active:hover {
-  color: var(--brand-blue);
+.timetable-toggle-btn.active svg {
+  color: #ffffff !important;
+}
+
+/* Custom File Selector Button Styling */
+.custom-file-input {
+  padding: 6px 12px !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  background: var(--bg-surface) !important;
+}
+
+.custom-file-input::file-selector-button {
+  background: var(--accent) !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 6px 14px !important;
+  margin-right: 12px !important;
+  border-radius: 8px !important;
+  font-weight: 700 !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2) !important;
+}
+
+.custom-file-input::file-selector-button:hover {
+  background: #1d4ed8 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(37, 99, 235, 0.3) !important;
+}
+
+/* Icon Action Button Styling */
+.icon-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.icon-action-btn:hover {
+  background: var(--badge-blue-bg);
+  color: var(--accent);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.icon-action-btn.danger:hover {
+  background: #FEF2F2;
+  color: #DC2626;
+  border-color: #FCA5A5;
 }
 
 /* Exam Timetable styled matching timetable.png */
@@ -2224,4 +2292,156 @@ html[data-theme='dark'] .dashboard-widget-todays-classes {
   100% {
     transform: rotate(360deg);
   }
+}
+
+/* ---------- Alert & Success Message Boxes ---------- */
+.alert-box {
+  background-color: #FEF2F2 !important;
+  border: 1px solid #FCA5A5 !important;
+  color: #DC2626 !important; /* Bold crimson red text */
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.1);
+}
+
+.alert-box svg {
+  color: #DC2626 !important;
+  flex-shrink: 0;
+}
+
+html[data-theme='dark'] .alert-box {
+  background-color: rgba(220, 38, 38, 0.18) !important;
+  border-color: rgba(220, 38, 38, 0.4) !important;
+  color: #F87171 !important;
+}
+
+html[data-theme='dark'] .alert-box svg {
+  color: #F87171 !important;
+}
+
+.success-box {
+  background-color: #ECFDF5 !important;
+  border: 1px solid #6EE7B7 !important;
+  color: #059669 !important;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+html[data-theme='dark'] .success-box {
+  background-color: rgba(16, 185, 129, 0.18) !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  color: #34D399 !important;
+}
+
+/* Custom Date Picker & Arrow Controls */
+.date-picker-control-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 6px 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.date-picker-custom-input {
+  background: transparent !important;
+  border: none !important;
+  color: var(--text-primary) !important;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  padding: 4px 6px;
+  outline: none !important;
+  cursor: pointer;
+  color-scheme: dark;
+}
+
+html[data-theme='light'] .date-picker-custom-input {
+  color-scheme: light;
+}
+
+.date-stepper-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-navigation);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.date-stepper-btn:hover {
+  background: var(--accent);
+  color: #ffffff !important;
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+/* Premium Event Cards Styling */
+.event-card-premium {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 16px 22px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.event-card-accent-stripe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 0;
+}
+
+.event-card-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.event-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.event-card-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-navigation);
+  padding: 4px 10px;
+  border-radius: 6px;
 }

@@ -19,7 +19,19 @@ export const CourseController = {
       const course = await CourseService.createCourse(req.body);
       return res.status(200).json(course);
     } catch (err) {
-      return res.status(400).json({ success: false, message: err.message });
+      const status = err.statusCode || 400;
+      return res.status(status).json({ success: false, message: err.message });
+    }
+  },
+
+  async updateCourse(req, res, next) {
+    try {
+      const id = req.params.id;
+      const updated = await CourseService.updateCourse(id, req.body);
+      return res.status(200).json(updated);
+    } catch (err) {
+      const status = err.statusCode || 400;
+      return res.status(status).json({ success: false, message: err.message });
     }
   },
 

@@ -7,7 +7,8 @@ export const AuthController = {
       const result = await AuthService.login(email, password);
       return res.status(200).json(result);
     } catch (err) {
-      return res.status(401).json({ success: false, message: err.message });
+      const status = err.statusCode || 401;
+      return res.status(status).json({ message: err.message });
     }
   },
 
@@ -17,12 +18,13 @@ export const AuthController = {
       const result = await AuthService.register(email, password);
       return res.status(200).json(result);
     } catch (err) {
-      return res.status(400).json({ success: false, message: err.message });
+      const status = err.statusCode || 400;
+      return res.status(status).json({ message: err.message });
     }
   },
 
   async logout(req, res) {
-    return res.status(204).build ? res.status(204).build() : res.status(204).send();
+    return res.status(204).send();
   },
 
   async resetPassword(req, res, next) {
@@ -31,7 +33,8 @@ export const AuthController = {
       const result = await AuthService.resetPassword(email);
       return res.status(200).json(result);
     } catch (err) {
-      return res.status(400).json({ success: false, message: err.message });
+      const status = err.statusCode || 400;
+      return res.status(status).json({ message: err.message });
     }
   },
 
@@ -41,7 +44,8 @@ export const AuthController = {
       const result = await AuthService.confirmPasswordReset(token, newPassword);
       return res.status(200).json(result);
     } catch (err) {
-      return res.status(400).json({ success: false, message: err.message });
+      const status = err.statusCode || 400;
+      return res.status(status).json({ message: err.message });
     }
   }
 };

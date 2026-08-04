@@ -11,5 +11,7 @@ export const scheduleSchema = z.object({
   isRepeating: z.boolean().optional().default(true),
   repeatFrequency: z.string().optional().default('weekly'),
   isClass: z.boolean().optional().default(true),
+  scheduleType: z.string().optional().default('CLASS'),
+  customCategory: z.string().nullable().optional(),
   userId: z.string().min(1, 'userId is required')
 });

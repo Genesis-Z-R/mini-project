@@ -1,4 +1,5 @@
 import { prisma } from '../config/db.js';
+import { NotificationService } from './notification.service.js';
 
 export const FriendshipService = {
   async getFriendshipsByUser(userId) {
@@ -17,8 +18,13 @@ export const FriendshipService = {
     const senderId = data.senderId.trim().toLowerCase();
     const receiverId = data.receiverId.trim().toLowerCase();
 
+    // Prevent self-following / self-request
+    if (senderId === receiverId) {
+      throw new Error("Cannot send friend request to yourself.");
+    }
+
     // Ensure profiles exist for both sender and receiver
-    await Promise.all([
+    const [senderProfile] = await Promise.all([
       prisma.profile.upsert({
         where: { id: senderId },
         update: {},
@@ -31,28 +37,63 @@ export const FriendshipService = {
       })
     ]);
 
+    const existingRelation = await prisma.friendship.findFirst({
+      where: {
+        OR: [
+          { senderId, receiverId },
+          { senderId: receiverId, receiverId: senderId }
+        ]
+      }
+    });
+
+    if (existingRelation) {
+      return existingRelation;
+    }
+
     const id = data.id || `fr_${Date.now()}`;
-    return await prisma.friendship.upsert({
-      where: { id },
-      update: {
-        senderId,
-        receiverId,
-        status: data.status || 'pending'
-      },
-      create: {
+    const friendship = await prisma.friendship.create({
+      data: {
         id,
         senderId,
         receiverId,
         status: data.status || 'pending'
       }
     });
+
+    // Centralized Notification Trigger: Friend Request Received
+    const senderName = senderProfile?.name || senderId.split('@')[0];
+    await NotificationService.createNotification({
+      userId: receiverId,
+      type: 'FRIEND_REQUEST_RECEIVED',
+      title: 'New Friend Request',
+      message: `${senderName} sent you a friend request.`,
+      link: 'peers'
+    });
+
+    return friendship;
   },
 
   async acceptRequest(id) {
-    return await prisma.friendship.update({
+    const updated = await prisma.friendship.update({
       where: { id },
       data: { status: 'accepted' }
     });
+
+    if (updated) {
+      const receiverProfile = await prisma.profile.findUnique({ where: { id: updated.receiverId } });
+      const accepterName = receiverProfile?.name || updated.receiverId.split('@')[0];
+
+      // Centralized Notification Trigger: Friend Request Accepted
+      await NotificationService.createNotification({
+        userId: updated.senderId,
+        type: 'FRIEND_REQUEST_ACCEPTED',
+        title: 'Friend Request Accepted',
+        message: `${accepterName} accepted your friend request!`,
+        link: 'peers'
+      });
+    }
+
+    return updated;
   },
 
   async removeFriendship(id) {

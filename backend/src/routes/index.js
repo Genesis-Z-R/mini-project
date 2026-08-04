@@ -8,6 +8,10 @@ import quizRoutes from './quiz.routes.js';
 import quizAttemptRoutes from './quizAttempt.routes.js';
 import studySessionRoutes from './studySession.routes.js';
 import friendshipRoutes from './friendship.routes.js';
+import programmeRoutes from './programme.routes.js';
+import peerRoutes from './peer.routes.js';
+import notificationRoutes from './notification.routes.js';
+import settingsRoutes from './settings.routes.js';
 import healthRoutes from './health.routes.js';
 
 const router = Router();
@@ -22,5 +26,9 @@ router.use('/quizzes', quizRoutes);
 router.use('/quiz-attempts', quizAttemptRoutes);
 router.use('/study-sessions', studySessionRoutes);
 router.use('/friendships', friendshipRoutes);
+router.use('/programmes', programmeRoutes);
+router.use('/peers', peerRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/settings', settingsRoutes);
 
 export default router;

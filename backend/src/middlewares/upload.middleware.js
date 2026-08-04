@@ -20,14 +20,14 @@ const storage = multer.diskStorage({
   }
 });
 
-const allowedTypes = /jpeg|jpg|png|gif|pdf|doc|docx|ppt|pptx|txt|mp4/;
+const allowedExtensions = /^(pdf|doc|docx|png|jpg|jpeg|gif|webp|mp4)$/i;
 
 const fileFilter = (req, file, cb) => {
-  const ext = path.extname(file.originalname).toLowerCase().substring(1);
-  if (allowedTypes.test(ext)) {
+  const ext = path.extname(file.originalname).toLowerCase().replace('.', '');
+  if (allowedExtensions.test(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('Invalid file type. Only documents, images, and videos are allowed.'));
+    cb(new Error('Unsupported file type. Only academic documents (.pdf, .doc, .docx), images (.png, .jpg, .jpeg, .gif, .webp), and videos (.mp4) are allowed.'));
   }
 };
 

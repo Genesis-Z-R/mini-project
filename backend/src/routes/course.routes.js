@@ -9,6 +9,7 @@ const router = Router();
 
 router.get('/', optionalAuth, CourseController.getCourses);
 router.post('/', optionalAuth, validate(courseSchema), CourseController.addCourse);
+router.put('/:id', optionalAuth, authorizeOwnership('Course', 'userId', 'id'), validate(courseSchema), CourseController.updateCourse);
 router.delete('/:id', optionalAuth, authorizeOwnership('Course', 'userId', 'id'), CourseController.deleteCourse);
 
 export default router;

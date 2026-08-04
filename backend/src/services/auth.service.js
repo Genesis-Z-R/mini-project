@@ -6,35 +6,21 @@ import { signToken } from '../utils/jwt.js';
 export const AuthService = {
   async login(email, password) {
     const emailKey = email.trim().toLowerCase();
-    let profile = await prisma.profile.findUnique({
+    const profile = await prisma.profile.findUnique({
       where: { email: emailKey }
     });
 
-    if (!profile) {
-      // Auto-create profile if user doesn't exist yet (matching Spring Boot / frontend behavior)
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(password, salt);
-      profile = await prisma.profile.create({
-        data: {
-          id: emailKey,
-          email: emailKey,
-          name: emailKey.split('@')[0],
-          passwordHash
-        }
-      });
-    } else if (profile.passwordHash) {
-      const isMatch = await bcrypt.compare(password, profile.passwordHash);
-      if (!isMatch) {
-        throw new Error('Invalid email or password');
-      }
-    } else {
-      // If user profile exists without passwordHash (e.g. seeded), set password hash on first login
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(password, salt);
-      await prisma.profile.update({
-        where: { email: emailKey },
-        data: { passwordHash }
-      });
+    if (!profile || !profile.passwordHash) {
+      const error = new Error('Invalid email or password');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    const isMatch = await bcrypt.compare(password, profile.passwordHash);
+    if (!isMatch) {
+      const error = new Error('Invalid email or password');
+      error.statusCode = 401;
+      throw error;
     }
 
     const token = signToken({ id: profile.id, email: profile.email });
@@ -52,6 +38,12 @@ export const AuthService = {
     const existing = await prisma.profile.findUnique({
       where: { email: emailKey }
     });
+
+    if (existing && existing.passwordHash) {
+      const error = new Error('An account with this email already exists.');
+      error.statusCode = 409;
+      throw error;
+    }
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
@@ -90,12 +82,11 @@ export const AuthService = {
     });
 
     if (!profile) {
-      // Return success message even if email not found (security best practice against user enumeration)
       return { message: 'Password reset link sent to your email.' };
     }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour
 
     await prisma.profile.update({
       where: { email: emailKey },
@@ -107,7 +98,7 @@ export const AuthService = {
 
     return {
       message: 'Password reset link sent to your email.',
-      resetToken // Returned for convenience in dev/testing
+      resetToken
     };
   },
 
@@ -120,7 +111,9 @@ export const AuthService = {
     });
 
     if (!profile) {
-      throw new Error('Failed to reset password. The token may be invalid or expired.');
+      const error = new Error('Failed to reset password. The token may be invalid or expired.');
+      error.statusCode = 400;
+      throw error;
     }
 
     const salt = await bcrypt.genSalt(10);

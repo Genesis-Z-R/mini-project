@@ -9,7 +9,7 @@ import { Profile } from './components/Profile';
 import { Setting } from './components/Setting';
 import { Peers } from './components/Peers';
 import { Courses } from './components/Courses';
-import { Groups } from './components/Groups';
+import { NotificationBell } from './components/NotificationBell';
 import { auth, DatabaseService, onAuthStateChanged, signOut } from './utils/db';
 import { List, User } from '@phosphor-icons/react';
 
@@ -18,16 +18,17 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [authChecking, setAuthChecking] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [targetCourseId, setTargetCourseId] = useState(null);
   
   // Database States
   const [courses, setCourses] = useState([]);
   const [schedule, setSchedule] = useState([]);
   const [files, setFiles] = useState([]);
-  const [groups, setGroups] = useState([]);
   const [studySessions, setStudySessions] = useState([]);
   const [quizzes, setQuizzes] = useState([]);
   const [friendships, setFriendships] = useState([]);
   const [quizAttempts, setQuizAttempts] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [profile, setProfile] = useState({
     name: '',
     email: '',
@@ -37,55 +38,70 @@ function App() {
     gender: '',
     notificationsEnabled: true,
     isPublic: true,
-    dailyDigestEnabled: true
+    dailyDigestEnabled: true,
+    isDarkMode: false,
+    publicResourceDirectoryEnabled: true,
+    publicProfileEnabled: true,
+    pushNotificationsMaster: true
   });
+  const [theme, setTheme] = useState(() => localStorage.getItem('estudy_theme') || 'light');
 
-  // Theme State
-  const [theme, setTheme] = useState(() => {
-    const saved = localStorage.getItem('ac-theme');
-    if (saved) return saved;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
-
+  // Apply Theme
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('ac-theme', theme);
+    localStorage.setItem('estudy_theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    if (currentUser) {
+      handleUpdateProfile({ ...profile, isDarkMode: nextTheme === 'dark' });
+    }
   };
 
-  // Auth State Listener
+  // Auth Listener
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        setCurrentUser(user);
-        setAuthChecking(false);
-      } else {
-        setCurrentUser(null);
-        setAuthChecking(false);
+    const storedUser = localStorage.getItem('estudy_user');
+    if (storedUser) {
+      try {
+        setCurrentUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Error parsing stored user:", e);
       }
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        const u = { uid: user.uid, email: user.email };
+        setCurrentUser(u);
+        localStorage.setItem('estudy_user', JSON.stringify(u));
+      } else {
+        const local = localStorage.getItem('estudy_user');
+        if (!local) {
+          setCurrentUser(null);
+        }
+      }
+      setAuthChecking(false);
     });
 
-    return () => unsubscribeAuth();
+    return () => unsubscribe();
   }, []);
 
-  // Sync state data from API
   const refreshAllData = async (emailKey) => {
     try {
-      const profileData = await DatabaseService.getProfile(emailKey);
-      if (profileData) {
-        setProfile(profileData);
+      const userProfile = await DatabaseService.getProfile(emailKey);
+      setProfile(userProfile);
+      if (userProfile.isDarkMode !== undefined) {
+        setTheme(userProfile.isDarkMode ? 'dark' : 'light');
       }
-      
+
       const coursesList = await DatabaseService.getCourses(emailKey);
       setCourses(coursesList);
 
       const scheduleList = await DatabaseService.getSchedule(emailKey);
       setSchedule(scheduleList);
 
-      // Files: Load own files
       const filesList = await DatabaseService.getFiles(emailKey);
       setFiles(filesList);
 
@@ -100,6 +116,9 @@ function App() {
 
       const attemptsList = await DatabaseService.getQuizAttempts(emailKey);
       setQuizAttempts(attemptsList);
+
+      const notifsList = await DatabaseService.getNotifications(emailKey);
+      setNotifications(notifsList);
     } catch (err) {
       console.error("Error refreshing workspace data:", err);
     }
@@ -110,11 +129,11 @@ function App() {
       setCourses([]);
       setSchedule([]);
       setFiles([]);
-      setGroups([]);
       setStudySessions([]);
       setQuizzes([]);
       setFriendships([]);
       setQuizAttempts([]);
+      setNotifications([]);
       setProfile({
         name: '',
         email: '',
@@ -140,145 +159,125 @@ function App() {
     setCourses([]);
     setSchedule([]);
     setFiles([]);
-    setGroups([]);
     setStudySessions([]);
     setQuizzes([]);
     setFriendships([]);
     setQuizAttempts([]);
-    setProfile({
-      name: '',
-      email: '',
-      indexNumber: '',
-      reference: '',
-      year: '',
-      gender: '',
-      notificationsEnabled: true,
-      isPublic: true,
-      dailyDigestEnabled: true
-    });
+    setNotifications([]);
     try {
-      void signOut(auth);
-    } catch (_) { }
-  };
-
-  const handleLoginSuccess = (user) => {
-    setCurrentUser(user);
-  };
-
-  // Course Handlers
-  const handleAddCourse = async (course) => {
-    await DatabaseService.addCourse(currentUser.email.toLowerCase(), course);
-    await refreshAllData(currentUser.email);
-  };
-
-  const handleDeleteCourse = async (id) => {
-    await DatabaseService.deleteCourse(id);
-    await refreshAllData(currentUser.email);
-  };
-
-  // Schedule Handlers
-  const handleAddScheduleItem = async (item) => {
-    const res = await DatabaseService.addScheduleItem(currentUser.email.toLowerCase(), item);
-    if (res.success) {
-      await refreshAllData(currentUser.email);
+      await signOut(auth);
+    } catch (e) {
+      console.warn("Sign out cleanup:", e.message);
     }
-    return res;
+  };
+
+  const handleUpdateProfile = async (updatedData) => {
+    if (!currentUser) return;
+    const emailKey = currentUser.email.toLowerCase().trim();
+    const result = await DatabaseService.updateProfile(emailKey, updatedData);
+    setProfile(result);
+    if (updatedData.isDarkMode !== undefined) {
+      setTheme(updatedData.isDarkMode ? 'dark' : 'light');
+    }
+  };
+
+  const handleAddCourse = async (courseData) => {
+    if (!currentUser) return;
+    await DatabaseService.addCourse({ ...courseData, userId: currentUser.email.toLowerCase() });
+    refreshAllData(currentUser.email.toLowerCase());
+  };
+
+  const handleRemoveCourse = async (courseId) => {
+    if (!currentUser) return;
+    await DatabaseService.removeCourse(courseId, currentUser.email.toLowerCase());
+    refreshAllData(currentUser.email.toLowerCase());
+  };
+
+  const handleUpdateCourse = async (courseData) => {
+    if (!currentUser) return;
+    await DatabaseService.updateCourse(courseData, currentUser.email.toLowerCase());
+    refreshAllData(currentUser.email.toLowerCase());
+  };
+
+  const handleAddScheduleItem = async (item) => {
+    if (!currentUser) return;
+    await DatabaseService.addScheduleItem({ ...item, userId: currentUser.email.toLowerCase() });
+    refreshAllData(currentUser.email.toLowerCase());
   };
 
   const handleRemoveScheduleItem = async (id) => {
-    await DatabaseService.removeScheduleItem(id);
-    await refreshAllData(currentUser.email);
+    if (!currentUser) return;
+    await DatabaseService.removeScheduleItem(id, currentUser.email.toLowerCase());
+    refreshAllData(currentUser.email.toLowerCase());
   };
 
-  const handleUpdateScheduleItem = async (id, item) => {
-    const res = await DatabaseService.updateScheduleItem(id, currentUser.email.toLowerCase(), item);
-    if (res.success) {
-      await refreshAllData(currentUser.email);
-    }
-    return res;
+  const handleUpdateScheduleItem = async (item) => {
+    if (!currentUser) return;
+    await DatabaseService.updateScheduleItem(item, currentUser.email.toLowerCase());
+    refreshAllData(currentUser.email.toLowerCase());
   };
 
-  // Study Sessions handler
-  const handleSaveStudySession = async (session) => {
-    await DatabaseService.saveStudySession({
-      ...session,
-      userId: currentUser.email.toLowerCase()
-    });
-    await refreshAllData(currentUser.email);
+  const handleAddFile = async (fileObj) => {
+    if (!currentUser) return;
+    await DatabaseService.uploadFileMetadata({ ...fileObj, userId: currentUser.email.toLowerCase() });
+    refreshAllData(currentUser.email.toLowerCase());
   };
 
-  // Resources / Files Handlers
-  const handleAddFile = async (fileData) => {
-    await DatabaseService.uploadFileMetadata({
-      ...fileData,
-      userId: currentUser.email.toLowerCase()
-    });
-    await refreshAllData(currentUser.email);
-  };
-
-  const handleDeleteFile = async (id, url) => {
-    await DatabaseService.deleteFile(id, url);
-    await refreshAllData(currentUser.email);
+  const handleDeleteFile = async (id) => {
+    if (!currentUser) return;
+    await DatabaseService.deleteFile(id);
+    refreshAllData(currentUser.email.toLowerCase());
   };
 
   const handleToggleFileVisibility = async (id, isPublic) => {
+    if (!currentUser) return;
     await DatabaseService.toggleFileVisibility(id, isPublic);
-    await refreshAllData(currentUser.email);
+    refreshAllData(currentUser.email.toLowerCase());
   };
 
-  // Profile Handler
-  const handleUpdateProfile = async (updatedProfile) => {
-    await DatabaseService.updateProfile(currentUser.email, updatedProfile);
-    await refreshAllData(currentUser.email);
+  const handleSaveStudySession = async (sessionData) => {
+    if (!currentUser) return;
+    await DatabaseService.addStudySession({ ...sessionData, userId: currentUser.email.toLowerCase() });
+    refreshAllData(currentUser.email.toLowerCase());
   };
 
-  // Quiz Handlers
-  const handleCreateQuiz = async (quiz) => {
-    await DatabaseService.addQuiz({
-      ...quiz,
-      userId: currentUser.email.toLowerCase()
-    });
-    await refreshAllData(currentUser.email);
+  const handleMarkNotificationAsRead = async (id) => {
+    await DatabaseService.markNotificationAsRead(id);
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
   };
 
-  const handleDeleteQuiz = async (id) => {
-    await DatabaseService.deleteQuiz(id);
-    await refreshAllData(currentUser.email);
-  };
-
-  const handleSaveQuizAttempt = async (attempt) => {
-    await DatabaseService.saveQuizAttempt({
-      ...attempt,
-      userId: currentUser.email.toLowerCase()
-    });
-    await refreshAllData(currentUser.email);
+  const handleMarkAllNotificationsAsRead = async () => {
+    if (!currentUser) return;
+    await DatabaseService.markAllNotificationsAsRead(currentUser.email.toLowerCase());
+    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
   };
 
   if (authChecking) {
     return (
-      <div className="login-bg-overlay">
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '20px', color: 'var(--text-primary)' }}>
-          Loading Estudy Workspace...
-        </div>
+      <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
+        <div style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-secondary)' }}>Loading Estudy Workspace...</div>
       </div>
     );
   }
 
   if (!currentUser) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+    return <Login onLoginSuccess={(u) => { setCurrentUser(u); setAuthChecking(false); }} />;
   }
 
-   const renderPanel = () => {
-     switch (activeTab) {
+  const renderPanel = () => {
+    switch (activeTab) {
       case 'dashboard':
         return (
           <Dashboard 
-            schedule={schedule} 
-            files={files} 
+            schedule={schedule}
+            files={files}
             courses={courses}
             studySessions={studySessions}
             onSaveStudySession={handleSaveStudySession}
-            onNavigate={setActiveTab}
+            onNavigate={(tab, courseIdVal) => {
+              if (courseIdVal) setTargetCourseId(courseIdVal);
+              setActiveTab(tab);
+            }}
             profile={profile}
           />
         );
@@ -291,14 +290,24 @@ function App() {
             quizAttempts={quizAttempts}
             userEmail={currentUser.email.toLowerCase()}
             onAddCourse={handleAddCourse}
-            onDeleteCourse={handleDeleteCourse}
+            onRemoveCourse={handleRemoveCourse}
+            onUpdateCourse={handleUpdateCourse}
             onAddFile={handleAddFile}
             onDeleteFile={handleDeleteFile}
             onToggleFileVisibility={handleToggleFileVisibility}
-            onCreateQuiz={handleCreateQuiz}
-            onDeleteQuiz={handleDeleteQuiz}
-            onSaveAttempt={handleSaveQuizAttempt}
             onRefresh={() => refreshAllData(currentUser.email.toLowerCase())}
+            targetCourseId={targetCourseId}
+            onClearTargetCourseId={() => setTargetCourseId(null)}
+          />
+        );
+      case 'peers':
+        return (
+          <Peers 
+            friendships={friendships}
+            setFriendships={setFriendships}
+            userEmail={currentUser.email.toLowerCase()}
+            onRefresh={() => refreshAllData(currentUser.email.toLowerCase())}
+            onNavigate={setActiveTab}
           />
         );
       case 'global_search':
@@ -324,15 +333,6 @@ function App() {
             onUpdateScheduleItem={handleUpdateScheduleItem}
           />
         );
-      case 'peers':
-        return (
-          <Peers 
-            friendships={friendships}
-            userEmail={currentUser.email.toLowerCase()}
-            onRefresh={() => refreshAllData(currentUser.email.toLowerCase())}
-            onNavigate={setActiveTab}
-          />
-        );
       case 'profile':
         return (
           <Profile 
@@ -342,24 +342,13 @@ function App() {
           />
         );
       case 'setting':
+      case 'settings':
         return (
           <Setting 
             theme={theme}
             onToggleTheme={toggleTheme}
             profile={profile}
             onUpdateProfile={handleUpdateProfile}
-          />
-        );
-      case 'groups':
-        return (
-          <Groups 
-            courses={courses} 
-            groups={groups} 
-            userEmail={currentUser.email.toLowerCase()}
-            onCreateCircle={handleCreateStudyCircle}
-            onToggleJoin={handleToggleJoinGroup}
-            onPromoteAdmin={handlePromoteCircleAdmin}
-            onPostResource={handleCirclePostResource}
           />
         );
       default:
@@ -379,13 +368,22 @@ function App() {
           <List size={22} weight="bold" />
         </button>
         <span className="mobile-brand-title">Estudy</span>
-        <button 
-          className="mobile-profile-shortcut"
-          onClick={() => setActiveTab('profile')}
-          aria-label="View Profile"
-        >
-          <User size={20} weight="bold" />
-        </button>
+        
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <NotificationBell 
+            notifications={notifications}
+            onMarkAsRead={handleMarkNotificationAsRead}
+            onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+            onNavigate={setActiveTab}
+          />
+          <button 
+            className="mobile-profile-shortcut"
+            onClick={() => setActiveTab('profile')}
+            aria-label="View Profile"
+          >
+            <User size={20} weight="bold" />
+          </button>
+        </div>
       </header>
 
       {/* Backdrop overlay for mobile sidebar drawer */}
@@ -397,16 +395,27 @@ function App() {
       )}
 
       <Sidebar 
-        currentTab={activeTab === 'groups' ? 'dashboard' : activeTab} 
+        currentTab={activeTab} 
         setCurrentTab={(tab) => {
           setActiveTab(tab);
-          setIsMobileMenuOpen(false); // Auto-close drawer on selection
+          setIsMobileMenuOpen(false);
         }} 
         user={currentUser} 
         onSignOut={handleSignOut}
         className={isMobileMenuOpen ? 'mobile-open' : ''}
       />
+      
       <main className="estudy-workspace">
+        {/* Workspace Top Toolbar */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: '20px' }}>
+          <NotificationBell 
+            notifications={notifications}
+            onMarkAsRead={handleMarkNotificationAsRead}
+            onMarkAllAsRead={handleMarkAllNotificationsAsRead}
+            onNavigate={setActiveTab}
+          />
+        </div>
+
         {renderPanel()}
       </main>
     </div>

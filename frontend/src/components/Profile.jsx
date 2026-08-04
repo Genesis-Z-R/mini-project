@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { CaretLeft, User } from '@phosphor-icons/react';
+import { CaretLeft, User, GraduationCap } from '@phosphor-icons/react';
+import { DatabaseService } from '../utils/db';
 
 const PROFILE_CACHE_KEY = 'estudy_profile_cache';
 
@@ -12,9 +13,27 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
   const [reference, setReference] = useState('');
   const [year, setYear] = useState('');
   const [gender, setGender] = useState('');
+  const [programmeId, setProgrammeId] = useState('');
+  const [programmeName, setProgrammeName] = useState('');
+  const [customProgramme, setCustomProgramme] = useState('');
+  const [programmesList, setProgrammesList] = useState([]);
+  
   const [saveError, setSaveError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const isInitialMount = useRef(true);
+
+  // Fetch available programmes from DB
+  useEffect(() => {
+    const fetchProgrammes = async () => {
+      try {
+        const list = await DatabaseService.getProgrammes();
+        setProgrammesList(list || []);
+      } catch (err) {
+        console.error('Error fetching programmes:', err);
+      }
+    };
+    fetchProgrammes();
+  }, []);
 
   const getCachedProfile = () => {
     try {
@@ -37,11 +56,11 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
   };
 
   const getSourceProfile = () => {
-    if (profile && (profile.name || profile.email || profile.indexNumber || profile.reference || profile.year || profile.gender)) {
+    if (profile && (profile.name || profile.email || profile.indexNumber || profile.reference || profile.year || profile.gender || profile.programmeName)) {
       return profile;
     }
     const cached = getCachedProfile();
-    if (cached && (cached.name || cached.email || cached.indexNumber || cached.reference || cached.year || cached.gender)) {
+    if (cached && (cached.name || cached.email || cached.indexNumber || cached.reference || cached.year || cached.gender || cached.programmeName)) {
       return cached;
     }
     return profile || cached || {};
@@ -59,6 +78,8 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
         setReference(source.reference || '');
         setYear(source.year || '');
         setGender(source.gender || '');
+        setProgrammeId(source.programmeId || '');
+        setProgrammeName(source.programmeName || source.programme?.name || '');
         return;
       }
     }
@@ -70,31 +91,57 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
       setReference(profile.reference || '');
       setYear(profile.year || '');
       setGender(profile.gender || '');
+      setProgrammeId(profile.programmeId || '');
+      setProgrammeName(profile.programmeName || profile.programme?.name || '');
     }
   }, [profile, source]);
 
-  const buildUpdatedProfile = () => ({
-    ...getSourceProfile(),
-    name: name.trim(),
-    email: email.trim(),
-    indexNumber: indexNumber.trim(),
-    reference: reference.trim(),
-    year,
-    gender
-  });
+  const handleProgrammeSelectChange = (e) => {
+    const val = e.target.value;
+    if (val === 'OTHER') {
+      setProgrammeId('OTHER');
+      setProgrammeName('');
+    } else {
+      setProgrammeId(val);
+      const found = programmesList.find(p => p.id === val);
+      setProgrammeName(found ? found.name : '');
+    }
+  };
 
   const handleSave = async () => {
     setSaveError('');
     setIsSaving(true);
     try {
-      const updated = buildUpdatedProfile();
+      let finalProgrammeId = programmeId;
+      let finalProgrammeName = programmeName;
+
+      // Handle custom programme creation
+      if (programmeId === 'OTHER' && customProgramme.trim()) {
+        const newProg = await DatabaseService.createProgramme(customProgramme.trim());
+        if (newProg && newProg.id) {
+          finalProgrammeId = newProg.id;
+          finalProgrammeName = newProg.name;
+          setProgrammesList(prev => [...prev, newProg]);
+        }
+      }
+
+      const updated = {
+        ...getSourceProfile(),
+        name: name.trim(),
+        email: email.trim(),
+        indexNumber: indexNumber.trim(),
+        reference: reference.trim(),
+        year,
+        gender,
+        programmeId: finalProgrammeId === 'OTHER' ? null : finalProgrammeId,
+        programmeName: finalProgrammeName
+      };
+
       await onUpdateProfile(updated);
       setCachedProfile(updated);
       setIsEditing(false);
     } catch (err) {
       setSaveError(err?.message || 'Failed to save changes');
-      const updated = buildUpdatedProfile();
-      setCachedProfile(updated);
     } finally {
       setIsSaving(false);
     }
@@ -104,6 +151,8 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
     setSaveError('');
     setIsEditing(true);
   };
+
+  const currentProgDisplay = source.programmeName || source.programme?.name || profile?.programmeName || '—';
 
   return (
     <motion.div
@@ -152,6 +201,42 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
         )}
 
         <div className="profile-details-table" style={{ width: '100%' }}>
+          {/* Programme of Study */}
+          <div className="profile-table-row">
+            <span className="profile-row-label">Programme of Study</span>
+            {isEditing ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '220px' }}>
+                <select 
+                  className="cohort-select" 
+                  value={programmeId} 
+                  onChange={handleProgrammeSelectChange}
+                  style={{ width: '100%', padding: '6px 12px', fontSize: '13px' }}
+                >
+                  <option value="">Select Programme...</option>
+                  {programmesList.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                  <option value="OTHER">+ Add Other Programme...</option>
+                </select>
+
+                {programmeId === 'OTHER' && (
+                  <input 
+                    type="text" 
+                    className="cohort-input" 
+                    placeholder="Enter Programme Name" 
+                    value={customProgramme}
+                    onChange={e => setCustomProgramme(e.target.value)}
+                    style={{ fontSize: '12px', padding: '6px 10px' }}
+                  />
+                )}
+              </div>
+            ) : (
+              <span className="profile-row-value" style={{ fontWeight: '700', color: 'var(--accent)' }}>
+                {currentProgDisplay}
+              </span>
+            )}
+          </div>
+
           <div className="profile-table-row">
             <span className="profile-row-label">Index Number</span>
             {isEditing ? (
@@ -161,7 +246,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 value={indexNumber} 
                 onChange={e => setIndexNumber(e.target.value)} 
                 placeholder="e.g. UG-18-5023"
-                style={{ width: '180px', padding: '6px 12px', fontSize: '13px' }}
+                style={{ width: '220px', padding: '6px 12px', fontSize: '13px' }}
               />
             ) : (
               <span className="profile-row-value">{source.indexNumber || profile.indexNumber || '—'}</span>
@@ -177,7 +262,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 value={reference} 
                 onChange={e => setReference(e.target.value)} 
                 placeholder="e.g. REF-238491"
-                style={{ width: '180px', padding: '6px 12px', fontSize: '13px' }}
+                style={{ width: '220px', padding: '6px 12px', fontSize: '13px' }}
               />
             ) : (
               <span className="profile-row-value">{source.reference || profile.reference || '—'}</span>
@@ -191,7 +276,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 className="cohort-select" 
                 value={year} 
                 onChange={e => setYear(e.target.value)}
-                style={{ width: '180px', padding: '6px 12px', fontSize: '13px' }}
+                style={{ width: '220px', padding: '6px 12px', fontSize: '13px' }}
               >
                 <option value="">Select Year...</option>
                 <option value="Year 1">Year 1</option>
@@ -211,7 +296,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 className="cohort-select" 
                 value={gender} 
                 onChange={e => setGender(e.target.value)}
-                style={{ width: '180px', padding: '6px 12px', fontSize: '13px' }}
+                style={{ width: '220px', padding: '6px 12px', fontSize: '13px' }}
               >
                 <option value="">Select Gender...</option>
                 <option value="Male">Male</option>

@@ -22,12 +22,12 @@ export const ProfileService = {
   async getProfileByEmail(email) {
     const emailKey = email.trim().toLowerCase();
     const profile = await prisma.profile.findUnique({
-      where: { email: emailKey }
+      where: { email: emailKey },
+      include: { programme: true }
     });
 
     if (profile) return profile;
 
-    // In-memory fallback profile matching Spring Boot & React frontend behavior
     return {
       id: emailKey,
       email: emailKey,
@@ -36,9 +36,22 @@ export const ProfileService = {
       reference: '',
       year: '',
       gender: '',
+      programmeId: null,
+      programmeName: '',
       notificationsEnabled: true,
       isPublic: true,
-      dailyDigestEnabled: true
+      dailyDigestEnabled: true,
+      isDarkMode: false,
+      publicResourceDirectoryEnabled: true,
+      publicProfileEnabled: true,
+      pushNotificationsMaster: true,
+      classRemindersEnabled: true,
+      studySessionRemindersEnabled: true,
+      eventRemindersEnabled: true,
+      friendRequestReceivedEnabled: true,
+      friendRequestAcceptedEnabled: true,
+      friendResourceUploadEnabled: true,
+      friendCourseResourceUploadEnabled: true
     };
   },
 
@@ -48,49 +61,52 @@ export const ProfileService = {
       where: { email: emailKey }
     });
 
-    const updateFields = {
-      name: profileData.name,
-      indexNumber: profileData.indexNumber,
-      reference: profileData.reference,
-      year: profileData.year,
-      gender: profileData.gender,
-      notificationsEnabled: profileData.notificationsEnabled ?? true,
-      isPublic: profileData.isPublic ?? true,
-      dailyDigestEnabled: profileData.dailyDigestEnabled ?? true
-    };
+    const updateFields = {};
+
+    const fieldsToSync = [
+      'name', 'indexNumber', 'reference', 'year', 'gender',
+      'programmeId', 'programmeName', 'notificationsEnabled',
+      'isPublic', 'dailyDigestEnabled', 'isDarkMode',
+      'publicResourceDirectoryEnabled', 'publicProfileEnabled',
+      'pushNotificationsMaster', 'classRemindersEnabled',
+      'studySessionRemindersEnabled', 'eventRemindersEnabled',
+      'friendRequestReceivedEnabled', 'friendRequestAcceptedEnabled',
+      'friendResourceUploadEnabled', 'friendCourseResourceUploadEnabled'
+    ];
+
+    fieldsToSync.forEach(field => {
+      if (profileData[field] !== undefined) {
+        updateFields[field] = profileData[field];
+      }
+    });
+
+    // Ensure isPublic and publicProfileEnabled stay synced if one is set
+    if (profileData.publicProfileEnabled !== undefined) {
+      updateFields.isPublic = profileData.publicProfileEnabled;
+    }
 
     if (existing) {
       return await prisma.profile.update({
         where: { email: emailKey },
-        data: updateFields
+        data: updateFields,
+        include: { programme: true }
       });
     } else {
       return await prisma.profile.create({
         data: {
           id: emailKey,
           email: emailKey,
+          name: profileData.name || emailKey.split('@')[0],
           ...updateFields
-        }
+        },
+        include: { programme: true }
       });
     }
   },
 
   async getAllProfiles() {
     return await prisma.profile.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        indexNumber: true,
-        reference: true,
-        year: true,
-        gender: true,
-        notificationsEnabled: true,
-        isPublic: true,
-        dailyDigestEnabled: true,
-        createdAt: true,
-        updatedAt: true
-      }
+      include: { programme: true }
     });
   }
 };
