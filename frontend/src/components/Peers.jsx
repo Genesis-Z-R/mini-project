@@ -342,7 +342,7 @@ export function Peers({ friendships = [], setFriendships, userEmail, onNavigate 
                   Calculating academic peer recommendations...
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                <div className="peers-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
                   {filteredRecommendedPeers.length > 0 ? (
                     filteredRecommendedPeers.map(peer => {
                       return (

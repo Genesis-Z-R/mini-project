@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { CaretLeft, User, GraduationCap } from '@phosphor-icons/react';
+import { CaretLeft, User, GraduationCap, SignOut, Gear, Moon, Shield, Globe } from '@phosphor-icons/react';
 import { DatabaseService } from '../utils/db';
 
 const PROFILE_CACHE_KEY = 'estudy_profile_cache';
 
-export function Profile({ profile, onUpdateProfile, onBack }) {
+export function Profile({ profile, onUpdateProfile, onBack, onSignOut, theme, onToggleTheme }) {
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -22,6 +22,14 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
   const [isSaving, setIsSaving] = useState(false);
   const isInitialMount = useRef(true);
 
+  // Settings states for integrated mobile settings panel
+  const [settings, setSettings] = useState({
+    isDarkMode: theme === 'dark',
+    publicResourceDirectoryEnabled: profile?.publicResourceDirectoryEnabled ?? true,
+    publicProfileEnabled: profile?.publicProfileEnabled ?? profile?.isPublic ?? true,
+    pushNotificationsMaster: profile?.pushNotificationsMaster ?? true
+  });
+
   // Fetch available programmes from DB
   useEffect(() => {
     const fetchProgrammes = async () => {
@@ -29,130 +37,147 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
         const list = await DatabaseService.getProgrammes();
         setProgrammesList(list || []);
       } catch (err) {
-        console.error('Error fetching programmes:', err);
+        console.error("Failed to load programmes:", err);
       }
     };
     fetchProgrammes();
   }, []);
 
-  const getCachedProfile = () => {
-    try {
-      const raw = localStorage.getItem(PROFILE_CACHE_KEY);
-      if (raw) {
-        return JSON.parse(raw);
-      }
-    } catch (err) {
-      void err;
-    }
-    return null;
-  };
-
-  const setCachedProfile = (data) => {
-    try {
-      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(data));
-    } catch (err) {
-      void err;
-    }
-  };
-
-  const getSourceProfile = () => {
-    if (profile && (profile.name || profile.email || profile.indexNumber || profile.reference || profile.year || profile.gender || profile.programmeName)) {
-      return profile;
-    }
-    const cached = getCachedProfile();
-    if (cached && (cached.name || cached.email || cached.indexNumber || cached.reference || cached.year || cached.gender || cached.programmeName)) {
-      return cached;
-    }
-    return profile || cached || {};
-  };
-
-  const source = getSourceProfile();
-
+  // Hydrate profile fields
   useEffect(() => {
+    if (!profile) return;
+    if (isEditing) return;
+
     if (isInitialMount.current) {
       isInitialMount.current = false;
-      if (source && (source.name || source.email)) {
-        setName(source.name || '');
-        setEmail(source.email || '');
-        setIndexNumber(source.indexNumber || '');
-        setReference(source.reference || '');
-        setYear(source.year || '');
-        setGender(source.gender || '');
-        setProgrammeId(source.programmeId || '');
-        setProgrammeName(source.programmeName || source.programme?.name || '');
-        return;
+      const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+      if (cached) {
+        try {
+          const c = JSON.parse(cached);
+          if (c.email === profile.email) {
+            setName(c.name || '');
+            setEmail(c.email || '');
+            setIndexNumber(c.indexNumber || '');
+            setReference(c.reference || '');
+            setYear(c.year || '');
+            setGender(c.gender || '');
+            setProgrammeId(c.programmeId || '');
+            setProgrammeName(c.programmeName || '');
+            setCustomProgramme(c.customProgramme || '');
+            return;
+          }
+        } catch (_) {}
       }
     }
 
-    if (profile) {
-      setName(profile.name || '');
-      setEmail(profile.email || '');
-      setIndexNumber(profile.indexNumber || '');
-      setReference(profile.reference || '');
-      setYear(profile.year || '');
-      setGender(profile.gender || '');
-      setProgrammeId(profile.programmeId || '');
-      setProgrammeName(profile.programmeName || profile.programme?.name || '');
-    }
-  }, [profile, source]);
+    setName(profile.name || '');
+    setEmail(profile.email || '');
+    setIndexNumber(profile.indexNumber || '');
+    setReference(profile.reference || '');
+    setYear(profile.year || '');
+    setGender(profile.gender || '');
+    setProgrammeId(profile.programmeId || '');
+    setProgrammeName(profile.programmeName || '');
+    setCustomProgramme(profile.customProgramme || '');
+
+    setSettings({
+      isDarkMode: theme === 'dark',
+      publicResourceDirectoryEnabled: profile.publicResourceDirectoryEnabled ?? true,
+      publicProfileEnabled: profile.publicProfileEnabled ?? profile.isPublic ?? true,
+      pushNotificationsMaster: profile.pushNotificationsMaster ?? true
+    });
+  }, [profile, isEditing, theme]);
 
   const handleProgrammeSelectChange = (e) => {
     const val = e.target.value;
+    setProgrammeId(val);
     if (val === 'OTHER') {
-      setProgrammeId('OTHER');
       setProgrammeName('');
     } else {
-      setProgrammeId(val);
-      const found = programmesList.find(p => p.id === val);
-      setProgrammeName(found ? found.name : '');
+      const match = programmesList.find(p => p.id === val);
+      if (match) {
+        setProgrammeName(match.name);
+      }
     }
+  };
+
+  const handleEdit = () => {
+    setName(profile?.name || '');
+    setEmail(profile?.email || '');
+    setIndexNumber(profile?.indexNumber || '');
+    setReference(profile?.reference || '');
+    setYear(profile?.year || '');
+    setGender(profile?.gender || '');
+    setProgrammeId(profile?.programmeId || '');
+    setProgrammeName(profile?.programmeName || '');
+    setCustomProgramme(profile?.customProgramme || '');
+    setIsEditing(true);
+    setSaveError('');
   };
 
   const handleSave = async () => {
     setSaveError('');
     setIsSaving(true);
-    try {
-      let finalProgrammeId = programmeId;
-      let finalProgrammeName = programmeName;
 
-      // Handle custom programme creation
-      if (programmeId === 'OTHER' && customProgramme.trim()) {
-        const newProg = await DatabaseService.createProgramme(customProgramme.trim());
-        if (newProg && newProg.id) {
-          finalProgrammeId = newProg.id;
-          finalProgrammeName = newProg.name;
-          setProgrammesList(prev => [...prev, newProg]);
-        }
+    let finalProgName = programmeName;
+    if (programmeId === 'OTHER') {
+      finalProgName = customProgramme.trim();
+      if (!finalProgName) {
+        setSaveError('Please enter custom programme name.');
+        setIsSaving(false);
+        return;
       }
+    }
 
-      const updated = {
-        ...getSourceProfile(),
-        name: name.trim(),
-        email: email.trim(),
-        indexNumber: indexNumber.trim(),
-        reference: reference.trim(),
-        year,
-        gender,
-        programmeId: finalProgrammeId === 'OTHER' ? null : finalProgrammeId,
-        programmeName: finalProgrammeName
-      };
+    const updatedData = {
+      ...profile,
+      name,
+      indexNumber,
+      reference,
+      year,
+      gender,
+      programmeId: programmeId === 'OTHER' ? null : programmeId,
+      programmeName: finalProgName,
+      customProgramme: programmeId === 'OTHER' ? finalProgName : ''
+    };
 
-      await onUpdateProfile(updated);
-      setCachedProfile(updated);
+    try {
+      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(updatedData));
+      await onUpdateProfile(updatedData);
       setIsEditing(false);
     } catch (err) {
-      setSaveError(err?.message || 'Failed to save changes');
+      console.error("Failed to update profile:", err);
+      setSaveError(err.message || 'Failed to update profile. Please try again.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleEdit = () => {
-    setSaveError('');
-    setIsEditing(true);
+  const handleSettingToggle = async (key, val) => {
+    const updatedSettings = { ...settings, [key]: val };
+    setSettings(updatedSettings);
+
+    if (key === 'isDarkMode' && onToggleTheme) {
+      if ((val && theme !== 'dark') || (!val && theme === 'dark')) {
+        onToggleTheme();
+      }
+    }
+
+    try {
+      await onUpdateProfile({
+        ...profile,
+        ...updatedSettings,
+        isPublic: key === 'publicProfileEnabled' ? val : (profile?.isPublic ?? true)
+      });
+    } catch (err) {
+      console.error('Failed to update settings from profile:', err);
+    }
   };
 
-  const currentProgDisplay = source.programmeName || source.programme?.name || profile?.programmeName || '—';
+  const source = isEditing ? { name, email, indexNumber, reference, year, gender, programmeName, programmeId } : (profile || {});
+  const currentProgDisplay = source.programmeId === 'OTHER' 
+    ? (customProgramme || source.programmeName || 'Custom Programme')
+    : (source.programmeName || 'Not Set');
 
   return (
     <motion.div
@@ -160,17 +185,32 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
-      <button className="back-arrow-btn" onClick={onBack} aria-label="Back" style={{ marginBottom: '16px' }}>
-        <CaretLeft size={16} weight="bold" />
-      </button>
-
-      <div className="profile-card-container">
-        <div className="profile-avatar-circle">
-          <User size={38} weight="bold" style={{ color: 'var(--brand-blue)' }} />
+      {/* Top Bar with Back Navigation */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+        <button 
+          className="back-arrow-btn" 
+          onClick={onBack}
+          aria-label="Back to Dashboard"
+          title="Back to Dashboard"
+        >
+          <CaretLeft size={16} weight="bold" />
+        </button>
+        <div>
+          <h2 style={{ fontSize: '24px', fontWeight: '800', margin: 0 }}>Student Profile</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
+            Manage your personal details, privacy settings, and account session.
+          </p>
         </div>
-        
+      </div>
+
+      <div className="profile-card-container nm-out" style={{ padding: '32px' }}>
+        {/* Profile Avatar Header */}
+        <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+          <User size={36} weight="bold" />
+        </div>
+
         {isEditing ? (
-          <div className="form-group" style={{ width: '100%', marginBottom: '12px' }}>
+          <div className="form-group" style={{ width: '100%', marginBottom: '16px' }}>
             <label className="form-label" style={{ textAlign: 'center' }}>Full Name</label>
             <input 
               type="text" 
@@ -200,12 +240,13 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
           <p className="profile-email-text">{source.email || profile.email || ''}</p>
         )}
 
+        {/* Profile Details Table */}
         <div className="profile-details-table" style={{ width: '100%' }}>
           {/* Programme of Study */}
           <div className="profile-table-row">
             <span className="profile-row-label">Programme of Study</span>
             {isEditing ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '220px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '240px' }}>
                 <select 
                   className="cohort-select" 
                   value={programmeId} 
@@ -245,8 +286,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 className="cohort-input" 
                 value={indexNumber} 
                 onChange={e => setIndexNumber(e.target.value)} 
-                placeholder="e.g. UG-18-5023"
-                style={{ width: '220px', padding: '6px 12px', fontSize: '13px' }}
+                style={{ width: '100%', maxWidth: '240px', padding: '6px 12px', fontSize: '13px' }}
               />
             ) : (
               <span className="profile-row-value">{source.indexNumber || profile.indexNumber || '—'}</span>
@@ -261,8 +301,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 className="cohort-input" 
                 value={reference} 
                 onChange={e => setReference(e.target.value)} 
-                placeholder="e.g. REF-238491"
-                style={{ width: '220px', padding: '6px 12px', fontSize: '13px' }}
+                style={{ width: '100%', maxWidth: '240px', padding: '6px 12px', fontSize: '13px' }}
               />
             ) : (
               <span className="profile-row-value">{source.reference || profile.reference || '—'}</span>
@@ -276,7 +315,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 className="cohort-select" 
                 value={year} 
                 onChange={e => setYear(e.target.value)}
-                style={{ width: '220px', padding: '6px 12px', fontSize: '13px' }}
+                style={{ width: '100%', maxWidth: '240px', padding: '6px 12px', fontSize: '13px' }}
               >
                 <option value="">Select Year...</option>
                 <option value="Year 1">Year 1</option>
@@ -296,7 +335,7 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
                 className="cohort-select" 
                 value={gender} 
                 onChange={e => setGender(e.target.value)}
-                style={{ width: '220px', padding: '6px 12px', fontSize: '13px' }}
+                style={{ width: '100%', maxWidth: '240px', padding: '6px 12px', fontSize: '13px' }}
               >
                 <option value="">Select Gender...</option>
                 <option value="Male">Male</option>
@@ -340,6 +379,31 @@ export function Profile({ profile, onUpdateProfile, onBack }) {
             </button>
           )}
         </div>
+
+
+
+        {/* Integrated Sign Out Button */}
+        {onSignOut && (
+          <div style={{ width: '100%', marginTop: '24px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+            <button 
+              className="cohort-btn" 
+              onClick={onSignOut}
+              style={{ 
+                width: '100%', 
+                justifyContent: 'center', 
+                background: 'rgba(239, 68, 68, 0.1)', 
+                color: '#EF4444', 
+                border: '1px solid rgba(239, 68, 68, 0.25)', 
+                fontWeight: '700',
+                padding: '12px 16px',
+                gap: '8px'
+              }}
+            >
+              <SignOut size={18} weight="bold" />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        )}
       </div>
     </motion.div>
   );

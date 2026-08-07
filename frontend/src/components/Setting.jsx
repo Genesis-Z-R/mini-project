@@ -12,15 +12,15 @@ export function Setting({ theme, onToggleTheme, profile, onUpdateProfile }) {
     isDarkMode: theme === 'dark',
     publicResourceDirectoryEnabled: profile?.publicResourceDirectoryEnabled ?? true,
     publicProfileEnabled: profile?.publicProfileEnabled ?? profile?.isPublic ?? true,
-    pushNotificationsMaster: profile?.pushNotificationsMaster ?? true,
-    dailyDigestEnabled: profile?.dailyDigestEnabled ?? true,
-    classRemindersEnabled: profile?.classRemindersEnabled ?? true,
-    studySessionRemindersEnabled: profile?.studySessionRemindersEnabled ?? true,
-    eventRemindersEnabled: profile?.eventRemindersEnabled ?? true,
-    friendRequestReceivedEnabled: profile?.friendRequestReceivedEnabled ?? true,
-    friendRequestAcceptedEnabled: profile?.friendRequestAcceptedEnabled ?? true,
-    friendResourceUploadEnabled: profile?.friendResourceUploadEnabled ?? true,
-    friendCourseResourceUploadEnabled: profile?.friendCourseResourceUploadEnabled ?? true
+    pushNotificationsMaster: profile?.pushNotificationsMaster ?? false,
+    dailyDigestEnabled: profile?.dailyDigestEnabled ?? false,
+    classRemindersEnabled: profile?.classRemindersEnabled ?? false,
+    studySessionRemindersEnabled: profile?.studySessionRemindersEnabled ?? false,
+    eventRemindersEnabled: profile?.eventRemindersEnabled ?? false,
+    friendRequestReceivedEnabled: profile?.friendRequestReceivedEnabled ?? false,
+    friendRequestAcceptedEnabled: profile?.friendRequestAcceptedEnabled ?? false,
+    friendResourceUploadEnabled: profile?.friendResourceUploadEnabled ?? false,
+    friendCourseResourceUploadEnabled: profile?.friendCourseResourceUploadEnabled ?? false
   });
 
   useEffect(() => {
@@ -30,15 +30,15 @@ export function Setting({ theme, onToggleTheme, profile, onUpdateProfile }) {
         isDarkMode: theme === 'dark',
         publicResourceDirectoryEnabled: profile.publicResourceDirectoryEnabled ?? true,
         publicProfileEnabled: profile.publicProfileEnabled ?? profile.isPublic ?? true,
-        pushNotificationsMaster: profile.pushNotificationsMaster ?? true,
-        dailyDigestEnabled: profile.dailyDigestEnabled ?? true,
-        classRemindersEnabled: profile.classRemindersEnabled ?? true,
-        studySessionRemindersEnabled: profile.studySessionRemindersEnabled ?? true,
-        eventRemindersEnabled: profile.eventRemindersEnabled ?? true,
-        friendRequestReceivedEnabled: profile.friendRequestReceivedEnabled ?? true,
-        friendRequestAcceptedEnabled: profile.friendRequestAcceptedEnabled ?? true,
-        friendResourceUploadEnabled: profile.friendResourceUploadEnabled ?? true,
-        friendCourseResourceUploadEnabled: profile.friendCourseResourceUploadEnabled ?? true
+        pushNotificationsMaster: profile.pushNotificationsMaster ?? false,
+        dailyDigestEnabled: profile.dailyDigestEnabled ?? false,
+        classRemindersEnabled: profile.classRemindersEnabled ?? false,
+        studySessionRemindersEnabled: profile.studySessionRemindersEnabled ?? false,
+        eventRemindersEnabled: profile.eventRemindersEnabled ?? false,
+        friendRequestReceivedEnabled: profile.friendRequestReceivedEnabled ?? false,
+        friendRequestAcceptedEnabled: profile.friendRequestAcceptedEnabled ?? false,
+        friendResourceUploadEnabled: profile.friendResourceUploadEnabled ?? false,
+        friendCourseResourceUploadEnabled: profile.friendCourseResourceUploadEnabled ?? false
       }));
     }
   }, [profile, theme]);
@@ -55,7 +55,25 @@ export function Setting({ theme, onToggleTheme, profile, onUpdateProfile }) {
   };
 
   const saveSettingChange = async (key, val) => {
-    const updated = { ...settings, [key]: val };
+    let updated = { ...settings, [key]: val };
+
+    // If master push notification toggle is changed, sync ALL individual notification sub-toggles
+    if (key === 'pushNotificationsMaster') {
+      updated = {
+        ...updated,
+        pushNotificationsMaster: val,
+        notificationsEnabled: val,
+        dailyDigestEnabled: val,
+        classRemindersEnabled: val,
+        studySessionRemindersEnabled: val,
+        eventRemindersEnabled: val,
+        friendRequestReceivedEnabled: val,
+        friendRequestAcceptedEnabled: val,
+        friendResourceUploadEnabled: val,
+        friendCourseResourceUploadEnabled: val
+      };
+    }
+
     setSettings(updated);
 
     if (key === 'isDarkMode') {
@@ -70,7 +88,9 @@ export function Setting({ theme, onToggleTheme, profile, onUpdateProfile }) {
         ...updated,
         isPublic: key === 'publicProfileEnabled' ? val : (profile?.isPublic ?? true)
       });
-      setSuccess('Preferences saved!');
+      setSuccess(key === 'pushNotificationsMaster' 
+        ? (val ? 'Push Notifications & All Alerts Enabled!' : 'All Push Notifications Disabled.') 
+        : 'Preferences saved!');
       setTimeout(() => setSuccess(''), 2500);
     } catch (err) {
       console.error('Failed to save settings:', err);
@@ -130,7 +150,7 @@ export function Setting({ theme, onToggleTheme, profile, onUpdateProfile }) {
       )}
 
       {/* Setting Split Layout */}
-      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '32px', alignItems: 'start' }}>
+      <div className="setting-split-layout" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: '32px', alignItems: 'start' }}>
         {/* Left Column Tab Buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {subTabs.map(tab => {
@@ -240,153 +260,177 @@ export function Setting({ theme, onToggleTheme, profile, onUpdateProfile }) {
 
           {activeSubTab === 'reminders' && (
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '8px' }}>Learning & Social Reminders</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '4px' }}>Notification & Reminder Preferences</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '24px' }}>
                 Select which specific academic, social, and study resource events you want to be notified about.
               </p>
 
-              {/* Daily Digest */}
-              <div className="profile-table-row" style={{ padding: '14px 0' }}>
-                <div>
-                  <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Daily Morning Summary</span>
-                  <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
-                    Receive a morning breakdown of today's classes and events.
-                  </p>
+              {/* CATEGORY 1: Academic & Schedule Alerts */}
+              <div className="reminder-category-card" style={{ marginBottom: '24px', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', background: 'var(--bg-surface)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+                  <GraduationCap size={18} weight="bold" style={{ color: 'var(--accent)' }} />
+                  <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0 }}>Academic & Schedule Alerts</h4>
                 </div>
-                <label className="cohort-switch">
-                  <input 
-                    type="checkbox" 
-                    checked={settings.dailyDigestEnabled} 
-                    onChange={e => handleToggle('dailyDigestEnabled', e.target.checked)}
-                  />
-                  <span className="switch-slider"></span>
-                </label>
+
+                {/* Daily Digest */}
+                <div className="profile-table-row" style={{ padding: '12px 0' }}>
+                  <div>
+                    <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Daily Morning Summary</span>
+                    <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
+                      Receive a morning breakdown of today's classes and events.
+                    </p>
+                  </div>
+                  <label className="cohort-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.dailyDigestEnabled} 
+                      onChange={e => handleToggle('dailyDigestEnabled', e.target.checked)}
+                    />
+                    <span className="switch-slider"></span>
+                  </label>
+                </div>
+
+                {/* Upcoming Class Reminders */}
+                <div className="profile-table-row" style={{ padding: '12px 0' }}>
+                  <div>
+                    <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Upcoming Class Reminders</span>
+                    <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
+                      Reminders before your scheduled lectures begin.
+                    </p>
+                  </div>
+                  <label className="cohort-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.classRemindersEnabled} 
+                      onChange={e => handleToggle('classRemindersEnabled', e.target.checked)}
+                    />
+                    <span className="switch-slider"></span>
+                  </label>
+                </div>
+
+                {/* Study Session Reminders */}
+                <div className="profile-table-row" style={{ padding: '12px 0' }}>
+                  <div>
+                    <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Study Session Reminders</span>
+                    <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
+                      Alerts for planned self-study sessions.
+                    </p>
+                  </div>
+                  <label className="cohort-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.studySessionRemindersEnabled} 
+                      onChange={e => handleToggle('studySessionRemindersEnabled', e.target.checked)}
+                    />
+                    <span className="switch-slider"></span>
+                  </label>
+                </div>
+
+                {/* Event / Assignment Reminders */}
+                <div className="profile-table-row" style={{ borderBottom: 'none', padding: '12px 0' }}>
+                  <div>
+                    <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Assignment & Event Reminders</span>
+                    <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
+                      Reminders for personal events and assignment deadlines.
+                    </p>
+                  </div>
+                  <label className="cohort-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.eventRemindersEnabled} 
+                      onChange={e => handleToggle('eventRemindersEnabled', e.target.checked)}
+                    />
+                    <span className="switch-slider"></span>
+                  </label>
+                </div>
               </div>
 
-              {/* Upcoming Class Reminders */}
-              <div className="profile-table-row" style={{ padding: '14px 0' }}>
-                <div>
-                  <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Upcoming Class Reminders</span>
-                  <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
-                    Reminders before your scheduled lectures begin.
-                  </p>
+              {/* CATEGORY 2: Social & Peer Activity Alerts */}
+              <div className="reminder-category-card" style={{ marginBottom: '24px', border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', background: 'var(--bg-surface)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+                  <Users size={18} weight="bold" style={{ color: 'var(--accent)' }} />
+                  <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0 }}>Social & Peer Activity</h4>
                 </div>
-                <label className="cohort-switch">
-                  <input 
-                    type="checkbox" 
-                    checked={settings.classRemindersEnabled} 
-                    onChange={e => handleToggle('classRemindersEnabled', e.target.checked)}
-                  />
-                  <span className="switch-slider"></span>
-                </label>
+
+                {/* Friend Request Received */}
+                <div className="profile-table-row" style={{ padding: '12px 0' }}>
+                  <div>
+                    <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Friend Request Received</span>
+                    <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
+                      Notify when a student sends you a friend request.
+                    </p>
+                  </div>
+                  <label className="cohort-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.friendRequestReceivedEnabled} 
+                      onChange={e => handleToggle('friendRequestReceivedEnabled', e.target.checked)}
+                    />
+                    <span className="switch-slider"></span>
+                  </label>
+                </div>
+
+                {/* Friend Request Accepted */}
+                <div className="profile-table-row" style={{ borderBottom: 'none', padding: '12px 0' }}>
+                  <div>
+                    <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Friend Request Accepted</span>
+                    <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
+                      Notify when a student accepts your friend request.
+                    </p>
+                  </div>
+                  <label className="cohort-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.friendRequestAcceptedEnabled} 
+                      onChange={e => handleToggle('friendRequestAcceptedEnabled', e.target.checked)}
+                    />
+                    <span className="switch-slider"></span>
+                  </label>
+                </div>
               </div>
 
-              {/* Study Session Reminders */}
-              <div className="profile-table-row" style={{ padding: '14px 0' }}>
-                <div>
-                  <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Study Session Reminders</span>
-                  <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
-                    Alerts for planned self-study sessions.
-                  </p>
+              {/* CATEGORY 3: Resource Sharing & Course Updates */}
+              <div className="reminder-category-card" style={{ border: '1px solid var(--border-color)', borderRadius: '12px', padding: '16px 20px', background: 'var(--bg-surface)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)' }}>
+                  <Globe size={18} weight="bold" style={{ color: 'var(--accent)' }} />
+                  <h4 style={{ fontSize: '14px', fontWeight: '700', margin: 0 }}>Resource Sharing & Course Updates</h4>
                 </div>
-                <label className="cohort-switch">
-                  <input 
-                    type="checkbox" 
-                    checked={settings.studySessionRemindersEnabled} 
-                    onChange={e => handleToggle('studySessionRemindersEnabled', e.target.checked)}
-                  />
-                  <span className="switch-slider"></span>
-                </label>
-              </div>
 
-              {/* Event / Assignment Reminders */}
-              <div className="profile-table-row" style={{ padding: '14px 0' }}>
-                <div>
-                  <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Assignment & Event Reminders</span>
-                  <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
-                    Reminders for personal events and assignment deadlines.
-                  </p>
+                {/* Friend Resource Uploads */}
+                <div className="profile-table-row" style={{ padding: '12px 0' }}>
+                  <div>
+                    <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Friend Resource Uploads</span>
+                    <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
+                      Notify when a friend uploads a study resource.
+                    </p>
+                  </div>
+                  <label className="cohort-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.friendResourceUploadEnabled} 
+                      onChange={e => handleToggle('friendResourceUploadEnabled', e.target.checked)}
+                    />
+                    <span className="switch-slider"></span>
+                  </label>
                 </div>
-                <label className="cohort-switch">
-                  <input 
-                    type="checkbox" 
-                    checked={settings.eventRemindersEnabled} 
-                    onChange={e => handleToggle('eventRemindersEnabled', e.target.checked)}
-                  />
-                  <span className="switch-slider"></span>
-                </label>
-              </div>
 
-              {/* Friend Request Received */}
-              <div className="profile-table-row" style={{ padding: '14px 0' }}>
-                <div>
-                  <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Friend Request Received</span>
-                  <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
-                    Notify when a student sends you a friend request.
-                  </p>
+                {/* Friend Course Resource Uploads */}
+                <div className="profile-table-row" style={{ borderBottom: 'none', padding: '12px 0' }}>
+                  <div>
+                    <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Enrolled Course Resource Uploads</span>
+                    <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
+                      High-priority alert when a friend uploads notes for one of your enrolled courses.
+                    </p>
+                  </div>
+                  <label className="cohort-switch">
+                    <input 
+                      type="checkbox" 
+                      checked={settings.friendCourseResourceUploadEnabled} 
+                      onChange={e => handleToggle('friendCourseResourceUploadEnabled', e.target.checked)}
+                    />
+                    <span className="switch-slider"></span>
+                  </label>
                 </div>
-                <label className="cohort-switch">
-                  <input 
-                    type="checkbox" 
-                    checked={settings.friendRequestReceivedEnabled} 
-                    onChange={e => handleToggle('friendRequestReceivedEnabled', e.target.checked)}
-                  />
-                  <span className="switch-slider"></span>
-                </label>
-              </div>
-
-              {/* Friend Request Accepted */}
-              <div className="profile-table-row" style={{ padding: '14px 0' }}>
-                <div>
-                  <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Friend Request Accepted</span>
-                  <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
-                    Notify when a student accepts your friend request.
-                  </p>
-                </div>
-                <label className="cohort-switch">
-                  <input 
-                    type="checkbox" 
-                    checked={settings.friendRequestAcceptedEnabled} 
-                    onChange={e => handleToggle('friendRequestAcceptedEnabled', e.target.checked)}
-                  />
-                  <span className="switch-slider"></span>
-                </label>
-              </div>
-
-              {/* Friend Resource Uploads */}
-              <div className="profile-table-row" style={{ padding: '14px 0' }}>
-                <div>
-                  <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Friend Resource Uploads</span>
-                  <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
-                    Notify when a friend uploads a study resource.
-                  </p>
-                </div>
-                <label className="cohort-switch">
-                  <input 
-                    type="checkbox" 
-                    checked={settings.friendResourceUploadEnabled} 
-                    onChange={e => handleToggle('friendResourceUploadEnabled', e.target.checked)}
-                  />
-                  <span className="switch-slider"></span>
-                </label>
-              </div>
-
-              {/* Friend Course Resource Uploads */}
-              <div className="profile-table-row" style={{ borderBottom: 'none', padding: '14px 0' }}>
-                <div>
-                  <span className="profile-row-label" style={{ fontSize: '13.5px', fontWeight: '700' }}>Friend Course Resource Uploads</span>
-                  <p className="profile-row-subtext" style={{ fontSize: '11.5px', color: 'var(--text-tertiary)' }}>
-                    High-priority alert when a friend uploads notes for one of your enrolled courses.
-                  </p>
-                </div>
-                <label className="cohort-switch">
-                  <input 
-                    type="checkbox" 
-                    checked={settings.friendCourseResourceUploadEnabled} 
-                    onChange={e => handleToggle('friendCourseResourceUploadEnabled', e.target.checked)}
-                  />
-                  <span className="switch-slider"></span>
-                </label>
               </div>
             </div>
           )}

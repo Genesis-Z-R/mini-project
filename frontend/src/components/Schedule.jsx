@@ -374,7 +374,7 @@ export function Schedule({
       )}
 
       {/* Main Schedule Grid: Calendar View & Day Breakdown */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'flex-start' }}>
+      <div className="schedule-main-split" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'flex-start' }}>
         {/* Left Side: Selected Date Breakdown (Classes vs Events) */}
         <div>
           {/* Day Header Bar */}

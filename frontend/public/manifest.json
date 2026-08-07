@@ -1,0 +1,40 @@
+{
+  "short_name": "Estudy",
+  "name": "Estudy — Academic Student Companion",
+  "description": "Tactile academic dashboard for student schedules, courses, peer recommendations, and shared study resources.",
+  "icons": [
+    {
+      "src": "/favicon-16x16.png",
+      "type": "image/png",
+      "sizes": "16x16"
+    },
+    {
+      "src": "/favicon-32x32.png",
+      "type": "image/png",
+      "sizes": "32x32"
+    },
+    {
+      "src": "/logo96.png",
+      "type": "image/png",
+      "sizes": "96x96"
+    },
+    {
+      "src": "/logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#F8FAFC",
+  "theme_color": "#5E81F4",
+  "display": "standalone",
+  "orientation": "any",
+  "categories": ["education", "productivity", "academic"]
+}

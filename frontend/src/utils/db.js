@@ -1,5 +1,5 @@
 // REST API Client Adapter for Spring Boot Backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 // Helper function to build headers with Authorization token if present
 const getAuthHeaders = () => {
@@ -223,6 +223,19 @@ export const DatabaseService = {
       saveLocalProfile(fallback);
       return fallback;
     }
+  },
+
+  async saveProfile(emailOrData, optionalData) {
+    let email, data;
+    if (typeof emailOrData === 'string') {
+      email = emailOrData;
+      data = optionalData;
+    } else {
+      data = emailOrData;
+      email = data?.email;
+    }
+    if (!email) return data;
+    return this.updateProfile(email, data);
   },
 
   async getAllProfiles() {

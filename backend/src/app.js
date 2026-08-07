@@ -13,7 +13,8 @@ const allowedOrigins = (env.CORS_ORIGIN || 'http://localhost:5173,http://localho
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (mobile apps/curl) or dev mode or matching allowedOrigins
+    if (!origin || env.NODE_ENV !== 'production' || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

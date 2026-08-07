@@ -147,10 +147,12 @@ export function Login({ onLoginSuccess }) {
           <div className="login-auth-card nm-out">
             <div className="login-brand-header">
               <div className="login-brand-row">
-                <div className="login-brand-icon">E</div>
+                <div className="login-brand-icon" style={{ background: 'transparent', boxShadow: 'none', padding: 0 }}>
+                  <img src="/logo96.png" alt="Estudy Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+                </div>
                 <div className="login-brand-text">
                   <h2 className="login-brand-title">Estudy</h2>
-                  <p className="login-brand-tagline">Learn From Home</p>
+                  <p className="login-brand-tagline">Easy Learning</p>
                 </div>
               </div>
             </div>
@@ -225,7 +227,9 @@ export function Login({ onLoginSuccess }) {
           <div className="login-visual-panel" />
           <div className="login-auth-card nm-out">
             <div className="login-brand-header">
-              <div className="login-brand-icon">E</div>
+              <div className="login-brand-icon" style={{ background: 'transparent', boxShadow: 'none', padding: 0, margin: '0 auto 12px auto' }}>
+                <img src="/logo96.png" alt="Estudy Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+              </div>
               <h2 style={{ fontSize: '24px', fontWeight: 800, fontFamily: 'var(--font-display)', color: '#000000' }}>Reset Password</h2>
               <p style={{ fontSize: '12.5px', color: '#000000' }}>Enter your email to receive a reset link</p>
             </div>
@@ -303,7 +307,9 @@ export function Login({ onLoginSuccess }) {
           <div className="login-visual-panel" />
           <div className="login-auth-card nm-out">
             <div className="login-brand-header">
-              <div className="login-brand-icon">E</div>
+              <div className="login-brand-icon" style={{ background: 'transparent', boxShadow: 'none', padding: 0, margin: '0 auto 12px auto' }}>
+                <img src="/logo96.png" alt="Estudy Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+              </div>
               <h2 style={{ fontSize: '24px', fontWeight: 800, fontFamily: 'var(--font-display)', color: '#000000' }}>Set New Password</h2>
               <p style={{ fontSize: '12.5px', color: '#000000' }}>
                 {tokenFromUrl ? 'Enter your new password' : 'Enter the reset token and your new password'}
@@ -404,10 +410,12 @@ export function Login({ onLoginSuccess }) {
         <div className="login-auth-card nm-out">
           <div className="login-brand-header">
             <div className="login-brand-row">
-              <div className="login-brand-icon">E</div>
+              <div className="login-brand-icon" style={{ background: 'transparent', boxShadow: 'none', padding: 0 }}>
+                <img src="/logo96.png" alt="Estudy Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+              </div>
               <div className="login-brand-text">
                 <h2 className="login-brand-title">Estudy</h2>
-                <p className="login-brand-tagline">Learn From Home</p>
+                <p className="login-brand-tagline">Easy Learning</p>
               </div>
             </div>
           </div>

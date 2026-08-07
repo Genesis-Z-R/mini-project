@@ -78,7 +78,7 @@ export const NotificationService = {
     });
 
     // 4. Browser Push delivery status check
-    const pushDelivered = user.pushNotificationsMaster ?? true;
+    const pushDelivered = user.pushNotificationsMaster ?? false;
 
     return {
       ...notification,

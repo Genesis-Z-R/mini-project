@@ -438,7 +438,7 @@ export function Repository({
 
           <div className="cohort-card nm-out" style={{ padding: '24px' }}>
             {/* Search Input Bar */}
-            <form onSubmit={handleGlobalSearchSubmit} style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
+            <form onSubmit={handleGlobalSearchSubmit} className="global-search-bar-container" style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
               <input 
                 type="text" 
                 className="cohort-input" 

@@ -219,7 +219,7 @@ export function Dashboard({
           </div>
 
           {/* Two-Column Middle widgets: Learning Timer & Today's Classes */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '28px' }}>
+          <div className="dashboard-middle-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '28px' }}>
             {/* Learning Timer & Interactive Session History */}
             <div
               className="cohort-card nm-out"
