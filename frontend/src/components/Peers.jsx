@@ -1,32 +1,41 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
-  UserPlus, UserMinus, Users, UserCheck, MagnifyingGlass, User, ShieldStar, Download, Plus, ArrowLeft, Warning, CheckCircle 
+  UserPlus, UserMinus, Users, UserCheck, MagnifyingGlass, User, ShieldStar, Download, Plus, ArrowLeft, Warning, CheckCircle, GraduationCap, Sparkle, BookOpen
 } from '@phosphor-icons/react';
 import { DatabaseService } from '../utils/db';
 
-export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
-  const [activeSubTab, setActiveSubTab] = useState('friends'); // 'friends' | 'find' | 'requests'
+export function Peers({ friendships = [], setFriendships, userEmail, onNavigate }) {
+  const [activeSubTab, setActiveSubTab] = useState('find'); // 'find' (Recommended Peers) | 'following' | 'requests'
   const [searchQuery, setSearchQuery] = useState('');
   const [allProfiles, setAllProfiles] = useState([]);
+  const [recommendedPeers, setRecommendedPeers] = useState([]);
   const [selectedFriend, setSelectedFriend] = useState(null);
   const [friendFiles, setFriendFiles] = useState([]);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [loadingPeers, setLoadingPeers] = useState(false);
 
-  // Fetch all profiles to match emails
-  const fetchProfiles = async () => {
+  // Fetch recommended peers and profiles once or when userEmail changes
+  const fetchRecommendedPeers = async () => {
+    setLoadingPeers(true);
     try {
-      const data = await DatabaseService.getAllProfiles();
-      setAllProfiles(data || []);
+      const [recData, profilesData] = await Promise.all([
+        DatabaseService.getRecommendedPeers(userEmail),
+        DatabaseService.getAllProfiles()
+      ]);
+      setRecommendedPeers(recData || []);
+      setAllProfiles(profilesData || []);
     } catch (err) {
-      console.error("Error fetching profiles:", err);
+      console.error("Error fetching recommended peers:", err);
+    } finally {
+      setLoadingPeers(false);
     }
   };
 
   useEffect(() => {
-    fetchProfiles();
-  }, [friendships]);
+    fetchRecommendedPeers();
+  }, [userEmail]);
 
   // Load selected friend's files
   useEffect(() => {
@@ -52,37 +61,76 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
     }
   };
 
-  // Add friend
-  const handleSendRequest = async (peerEmail) => {
+  // Follow / Send request (Targeted State Update - No Blinking)
+  const handleFollowPeer = async (peerEmail) => {
     try {
-      await DatabaseService.sendFriendRequest(userEmail, peerEmail);
-      showNotification(`Friend request sent to ${peerEmail}`);
-      onRefresh();
+      const newFriendship = await DatabaseService.sendFriendRequest(userEmail, peerEmail);
+      showNotification(`Request sent to ${peerEmail}`);
+      
+      // 1. Target update recommendedPeers state locally
+      setRecommendedPeers(prev => prev.map(p => {
+        if (p.email.toLowerCase() === peerEmail.toLowerCase()) {
+          return { ...p, followStatus: 'sent', friendshipId: newFriendship?.id || `fr_${Date.now()}` };
+        }
+        return p;
+      }));
+
+      // 2. Target update friendships state in parent
+      if (setFriendships && newFriendship) {
+        setFriendships(prev => [...prev.filter(f => f.id !== newFriendship.id), newFriendship]);
+      }
     } catch (err) {
-      showNotification("Error sending request.", false);
+      showNotification("Error connecting with peer.", false);
     }
   };
 
-  // Accept request
-  const handleAcceptRequest = async (friendshipId) => {
+  // Accept request (Targeted State Update - No Blinking)
+  const handleAcceptRequest = async (friendshipId, senderEmail) => {
     try {
-      await DatabaseService.acceptFriendRequest(friendshipId);
-      showNotification("Friend request accepted!");
-      onRefresh();
+      const updated = await DatabaseService.acceptFriendRequest(friendshipId, userEmail);
+      showNotification("Peer request accepted!");
+
+      // 1. Target update recommendedPeers state locally
+      setRecommendedPeers(prev => prev.map(p => {
+        if (p.friendshipId === friendshipId || (senderEmail && p.email.toLowerCase() === senderEmail.toLowerCase())) {
+          return { ...p, followStatus: 'following', friendshipId };
+        }
+        return p;
+      }));
+
+      // 2. Target update friendships state in parent
+      if (setFriendships) {
+        setFriendships(prev => prev.map(f => f.id === friendshipId ? { ...f, status: 'accepted' } : f));
+      }
     } catch (err) {
       showNotification("Error accepting request.", false);
     }
   };
 
-  // Decline/Remove friendship
-  const handleRemoveFriendship = async (friendshipId) => {
+  // Unfollow / Decline / Remove friendship (Targeted State Update - No Blinking)
+  const handleRemoveFollow = async (friendshipId, peerEmail) => {
     try {
-      await DatabaseService.removeFriendship(friendshipId);
-      showNotification("Friendship/Request removed.");
-      onRefresh();
-      setSelectedFriend(null);
+      await DatabaseService.removeFriendship(friendshipId, userEmail);
+      showNotification("Peer connection removed.");
+
+      // 1. Target update recommendedPeers state locally
+      setRecommendedPeers(prev => prev.map(p => {
+        if (p.friendshipId === friendshipId || (peerEmail && p.email.toLowerCase() === peerEmail.toLowerCase())) {
+          return { ...p, followStatus: 'none', friendshipId: null };
+        }
+        return p;
+      }));
+
+      // 2. Target update friendships state in parent
+      if (setFriendships) {
+        setFriendships(prev => prev.filter(f => f.id !== friendshipId));
+      }
+
+      if (selectedFriend && (selectedFriend.friendshipId === friendshipId || selectedFriend.email === peerEmail)) {
+        setSelectedFriend(null);
+      }
     } catch (err) {
-      showNotification("Error removing friendship.", false);
+      showNotification("Error removing peer connection.", false);
     }
   };
 
@@ -91,13 +139,11 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
     try {
       await DatabaseService.addPublicFileToMine(file, userEmail);
       showNotification(`"${file.title}" added to your My Resources folder!`);
-      onRefresh();
     } catch (err) {
       showNotification("Error copying file.", false);
     }
   };
 
-  // Helper file download mock
   const handleDownload = (file) => {
     const fileContent = `Estudy Shared Peer Resource\n` +
       `File Name: ${file.title}\n` +
@@ -116,17 +162,15 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
     if (!file.url) URL.revokeObjectURL(url);
   };
 
-  // Helper calculations
-  // Get accepted friends emails
+  // Accepted friends profiles
   const acceptedFriendEmails = friendships
     .filter(f => f.status === 'accepted')
     .map(f => f.senderId === userEmail ? f.receiverId : f.senderId);
 
-  const friendsProfiles = allProfiles.filter(p => acceptedFriendEmails.includes(p.email));
+  const followingProfiles = recommendedPeers.filter(p => p.followStatus === 'following' || acceptedFriendEmails.includes(p.email));
 
   // Get incoming requests
   const incomingRequests = friendships.filter(f => f.receiverId === userEmail && f.status === 'pending');
-  // Get profiles of senders
   const incomingRequestProfiles = incomingRequests.map(req => {
     const profile = allProfiles.find(p => p.email === req.senderId);
     return {
@@ -135,27 +179,15 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
     };
   });
 
-  // Filter out users who are already friends, sent requests, or yourself
-  const searchResults = allProfiles.filter(p => {
-    if (p.email === userEmail) return false;
-    // Check match query
-    const matchesSearch = p.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          p.email.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
+  // Filter recommended peers by search query
+  const filteredRecommendedPeers = recommendedPeers.filter(peer => {
+    if (!searchQuery.trim()) return true;
+    const query = searchQuery.toLowerCase().trim();
+    return peer.name?.toLowerCase().includes(query) ||
+           peer.email.toLowerCase().includes(query) ||
+           peer.programmeName?.toLowerCase().includes(query) ||
+           (peer.sharedCourses || []).some(c => c.toLowerCase().includes(query));
   });
-
-  const getFriendshipStatus = (peerEmail) => {
-    const relation = friendships.find(f => 
-      (f.senderId === userEmail && f.receiverId === peerEmail) ||
-      (f.senderId === peerEmail && f.receiverId === userEmail)
-    );
-    if (!relation) return 'none';
-    if (relation.status === 'accepted') return 'accepted';
-    if (relation.status === 'pending') {
-      return relation.senderId === userEmail ? 'sent' : 'received';
-    }
-    return 'none';
-  };
 
   return (
     <motion.div
@@ -163,11 +195,11 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
-      {/* Standalone Header */}
+      {/* Header */}
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>Peers Directory</h2>
+        <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>Find Peers</h2>
         <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-          Connect with friends, accept invites, and share study materials.
+          Discover and connect with students in your programme and shared courses.
         </p>
       </div>
 
@@ -185,15 +217,9 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
         </div>
       )}
 
-      {/* Tabs list */}
+      {/* Navigation Sub-Tabs */}
       <div className="timetable-toggle-container" style={{ marginBottom: '24px' }}>
         <div className="timetable-toggle-bar">
-          <button 
-            className={`timetable-toggle-btn ${activeSubTab === 'friends' ? 'active' : ''}`}
-            onClick={() => { setActiveSubTab('friends'); setSelectedFriend(null); }}
-          >
-            My Friends ({friendsProfiles.length})
-          </button>
           <button 
             className={`timetable-toggle-btn ${activeSubTab === 'find' ? 'active' : ''}`}
             onClick={() => { setActiveSubTab('find'); setSelectedFriend(null); }}
@@ -201,11 +227,17 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
             Find Peers
           </button>
           <button 
+            className={`timetable-toggle-btn ${activeSubTab === 'following' ? 'active' : ''}`}
+            onClick={() => { setActiveSubTab('following'); setSelectedFriend(null); }}
+          >
+            Following ({followingProfiles.length})
+          </button>
+          <button 
             className={`timetable-toggle-btn ${activeSubTab === 'requests' ? 'active' : ''}`}
             onClick={() => { setActiveSubTab('requests'); setSelectedFriend(null); }}
             style={{ position: 'relative' }}
           >
-            Friend Requests {incomingRequestProfiles.length > 0 && (
+            Peer Requests {incomingRequestProfiles.length > 0 && (
               <span style={{ background: 'var(--accent)', color: 'white', borderRadius: '10px', padding: '2px 6px', fontSize: '9px', fontWeight: 'bold', marginLeft: '6px' }}>
                 {incomingRequestProfiles.length}
               </span>
@@ -215,9 +247,7 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
       </div>
 
       {selectedFriend ? (
-        /* ============================================================
-           FRIEND DETAILS & FILE LIST
-           ============================================================ */
+        /* PEER DETAILS & SHARED FILES VIEW */
         <div className="cohort-card nm-out" style={{ padding: '28px' }}>
           <button 
             className="back-arrow-btn" 
@@ -227,37 +257,32 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
             <ArrowLeft size={16} weight="bold" />
           </button>
 
-          <div style={{ display: 'flex', justify: 'space-between', alignItems: 'start', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', borderBottom: '1px solid var(--border-color)', paddingBottom: '20px', marginBottom: '24px' }}>
             <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-              <div className="peer-avatar" style={{ width: '48px', height: '48px' }}>
-                <User size={24} weight="bold" />
+              <div style={{ width: '52px', height: '52px', background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <User size={26} weight="bold" />
               </div>
               <div>
-                <h3 style={{ fontSize: '18px', fontWeight: '800' }}>{selectedFriend.name}</h3>
+                <h3 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-primary)' }}>{selectedFriend.name}</h3>
                 <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{selectedFriend.email}</span>
                 <div style={{ display: 'flex', gap: '8px', marginTop: '6px', fontSize: '11.5px', color: 'var(--accent)', fontWeight: '700' }}>
-                  <span>{selectedFriend.year || 'No Year'}</span>
+                  <span>🎓 {selectedFriend.programmeName || 'Student'}</span>
                   <span>•</span>
-                  <span>{selectedFriend.indexNumber || 'No Index'}</span>
+                  <span>{selectedFriend.year || 'No Year'}</span>
                 </div>
               </div>
             </div>
             
-            {/* Remove Friend button */}
             <button
               className="cohort-btn"
               onClick={() => {
-                const link = friendships.find(f => 
-                  (f.senderId === userEmail && f.receiverId === selectedFriend.email) ||
-                  (f.senderId === selectedFriend.email && f.receiverId === userEmail)
-                );
-                if (link && confirm(`Remove ${selectedFriend.name} from friends?`)) {
-                  handleRemoveFriendship(link.id);
+                if (selectedFriend.friendshipId && confirm(`Unfollow ${selectedFriend.name}?`)) {
+                  handleRemoveFollow(selectedFriend.friendshipId, selectedFriend.email);
                 }
               }}
               style={{ color: '#EF4444' }}
             >
-              Unfriend
+              Unfollow
             </button>
           </div>
 
@@ -265,7 +290,7 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {friendFiles.length > 0 ? (
               friendFiles.map(file => (
-                <div key={file.id} style={{ display: 'flex', justify: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'var(--bg-navigation)', borderRadius: '12px' }}>
+                <div key={file.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'var(--bg-navigation)', borderRadius: '12px' }}>
                   <div>
                     <strong style={{ fontSize: '13.5px', display: 'block', color: 'var(--text-primary)' }}>{file.title}</strong>
                     <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{file.size} • {file.fileType.toUpperCase()}</span>
@@ -291,20 +316,139 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
               ))
             ) : (
               <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '40px 0' }}>
-                This friend hasn't shared any public files yet.
+                This student hasn't shared any public files yet.
               </div>
             )}
           </div>
         </div>
       ) : (
-        /* ============================================================
-           TAB VIEWS
-           ============================================================ */
+        /* TAB CONTENT PANELS */
         <div>
-          {activeSubTab === 'friends' && (
+          {/* TAB 1: RECOMMENDED PEERS */}
+          {activeSubTab === 'find' && (
+            <div>
+              <div className="peers-search-bar" style={{ marginBottom: '24px' }}>
+                <input 
+                  type="text" 
+                  className="cohort-input" 
+                  placeholder="Filter recommended peers by name, programme, or course code..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              {loadingPeers ? (
+                <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)', fontSize: '13px' }}>
+                  Calculating academic peer recommendations...
+                </div>
+              ) : (
+                <div className="peers-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '20px' }}>
+                  {filteredRecommendedPeers.length > 0 ? (
+                    filteredRecommendedPeers.map(peer => {
+                      return (
+                        <div key={peer.id} className="cohort-card nm-out" style={{ padding: '22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '16px' }}>
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                              <div>
+                                <strong style={{ fontSize: '15px', display: 'block', color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                                  {peer.name}
+                                </strong>
+                                <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>{peer.email}</span>
+                              </div>
+                              {peer.matchScore > 0 && (
+                                <span style={{ fontSize: '10px', fontWeight: '800', padding: '3px 8px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                  <Sparkle size={10} weight="fill" />
+                                  Match Score: {peer.matchScore}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Academic Tags */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '12px' }}>
+                              <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <GraduationCap size={15} style={{ color: 'var(--accent)' }} />
+                                <span>{peer.programmeName}</span>
+                              </div>
+
+                              {peer.year && (
+                                <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                                  Academic Level: <strong>{peer.year}</strong>
+                                </div>
+                              )}
+
+                              {peer.matchReasons && peer.matchReasons.length > 0 && (
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                                  {peer.matchReasons.map((reason, idx) => (
+                                    <span key={idx} style={{ fontSize: '10px', fontWeight: '600', padding: '2px 8px', borderRadius: '4px', background: 'var(--bg-navigation)', color: 'var(--text-secondary)' }}>
+                                      {reason}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Action Button */}
+                          <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '14px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            {peer.followStatus === 'none' && (
+                              <button 
+                                className="cohort-btn cohort-btn-primary" 
+                                onClick={() => handleFollowPeer(peer.email)} 
+                                style={{ fontSize: '12px', padding: '8px 16px', gap: '6px' }}
+                              >
+                                <UserPlus size={14} weight="bold" />
+                                <span>Follow / Connect</span>
+                              </button>
+                            )}
+
+                            {peer.followStatus === 'following' && (
+                              <button 
+                                className="cohort-btn"
+                                onClick={() => setSelectedFriend(peer)}
+                                style={{ fontSize: '12px', padding: '6px 12px', gap: '6px', background: 'rgba(16,185,129,0.15)', color: 'var(--accent)', border: 'none' }}
+                              >
+                                <UserCheck size={14} weight="bold" />
+                                <span>Following (View Files)</span>
+                              </button>
+                            )}
+
+                            {peer.followStatus === 'sent' && (
+                              <span style={{ fontSize: '11.5px', color: 'var(--text-tertiary)', fontWeight: '600', padding: '6px 0', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                <UserCheck size={14} />
+                                Request Sent
+                              </span>
+                            )}
+
+                            {peer.followStatus === 'received' && (
+                              <button 
+                                className="cohort-btn cohort-btn-primary" 
+                                onClick={() => {
+                                  if (peer.friendshipId) handleAcceptRequest(peer.friendshipId, peer.email);
+                                }}
+                                style={{ fontSize: '12px', padding: '8px 16px' }}
+                              >
+                                Accept Follow Request
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="cohort-card" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '60px', color: 'var(--text-tertiary)' }}>
+                      No peer recommendations found matching your academic programme.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 2: FOLLOWING / CONNECTIONS */}
+          {activeSubTab === 'following' && (
             <div className="peers-grid">
-              {friendsProfiles.length > 0 ? (
-                friendsProfiles.map(peer => (
+              {followingProfiles.length > 0 ? (
+                followingProfiles.map(peer => (
                   <div 
                     key={peer.email} 
                     className="peer-profile-card nm-out"
@@ -317,101 +461,61 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
                     <strong style={{ fontSize: '14px', display: 'block', color: 'var(--text-primary)' }}>{peer.name}</strong>
                     <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{peer.email}</span>
                     <div style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '700', marginTop: '8px' }}>
-                      {peer.year || 'No Year'} • {peer.indexNumber || 'No Index'}
+                      🎓 {peer.programmeName || 'Student'} • {peer.year || 'No Year'}
                     </div>
                   </div>
                 ))
               ) : (
                 <div className="cohort-card" style={{ gridColumn: 'span 3', textAlign: 'center', padding: '60px', color: 'var(--text-tertiary)' }}>
-                  You haven't added any friends yet. Navigate to "Find Peers" to search and connect!
+                  You are not following any peers yet. Explore recommended peers to build your student network!
                 </div>
               )}
             </div>
           )}
 
-          {activeSubTab === 'find' && (
-            <div>
-              <div className="peers-search-bar" style={{ marginBottom: '24px' }}>
-                <input 
-                  type="text" 
-                  className="cohort-input" 
-                  placeholder="Search registered students by name or email..." 
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-                {searchResults.length > 0 ? (
-                  searchResults.map(peer => {
-                    const status = getFriendshipStatus(peer.email);
-                    return (
-                      <div key={peer.email} className="cohort-card nm-out" style={{ padding: '20px', display: 'flex', justify: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <strong style={{ fontSize: '13.5px', display: 'block', color: 'var(--text-primary)' }}>{peer.name}</strong>
-                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{peer.email}</span>
-                        </div>
-
-                        <div>
-                          {status === 'none' && (
-                            <button className="cohort-btn cohort-btn-primary" onClick={() => handleSendRequest(peer.email)} style={{ fontSize: '11.5px', padding: '6px 12px' }}>
-                              Add Friend
-                            </button>
-                          )}
-                          {status === 'sent' && (
-                            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: '600' }}>Requested</span>
-                          )}
-                          {status === 'received' && (
-                            <button 
-                              className="cohort-btn cohort-btn-primary" 
-                              onClick={() => {
-                                const req = friendships.find(f => f.senderId === peer.email && f.receiverId === userEmail);
-                                if (req) handleAcceptRequest(req.id);
-                              }}
-                              style={{ fontSize: '11px', padding: '6px 12px' }}
-                            >
-                              Accept
-                            </button>
-                          )}
-                          {status === 'accepted' && (
-                            <span style={{ color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '700' }}>
-                              <UserCheck size={14} />
-                              Friends
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="cohort-card" style={{ gridColumn: 'span 3', textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
-                    No students found.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
+          {/* TAB 3: INCOMING PEER REQUESTS */}
           {activeSubTab === 'requests' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               {incomingRequestProfiles.length > 0 ? (
                 incomingRequestProfiles.map(item => (
-                  <div key={item.id} className="cohort-card nm-out" style={{ padding: '20px', display: 'flex', justify: 'space-between', alignItems: 'center' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <div className="peer-avatar" style={{ width: '38px', height: '38px' }}>
-                        <User size={18} />
+                  <div 
+                    key={item.id} 
+                    className="cohort-card nm-out" 
+                    style={{ 
+                      padding: '22px 28px', 
+                      display: 'flex', 
+                      justifyContent: 'space-between', 
+                      alignItems: 'center',
+                      gap: '20px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <div style={{ width: '46px', height: '46px', flexShrink: 0, background: 'var(--accent-soft)', color: 'var(--accent)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <User size={22} weight="bold" />
                       </div>
                       <div>
-                        <strong style={{ fontSize: '14px', display: 'block' }}>{item.profile.name}</strong>
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{item.profile.email}</span>
+                        <strong style={{ fontSize: '15px', display: 'block', color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                          {item.profile.name}
+                        </strong>
+                        <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginTop: '2px' }}>
+                          {item.profile.email}
+                        </span>
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      <button className="cohort-btn cohort-btn-primary" onClick={() => handleAcceptRequest(item.id)}>
+                    <div style={{ display: 'flex', gap: '10px', flexShrink: 0, alignItems: 'center' }}>
+                      <button 
+                        className="cohort-btn cohort-btn-primary" 
+                        onClick={() => handleAcceptRequest(item.id, item.profile.email)}
+                        style={{ padding: '8px 20px', fontSize: '12px', fontWeight: '700' }}
+                      >
                         Accept
                       </button>
-                      <button className="cohort-btn" onClick={() => handleRemoveFriendship(item.id)} style={{ color: '#EF4444' }}>
+                      <button 
+                        className="cohort-btn" 
+                        onClick={() => handleRemoveFollow(item.id, item.profile.email)} 
+                        style={{ padding: '8px 16px', fontSize: '12px', color: '#EF4444', background: 'rgba(239, 68, 68, 0.08)', border: 'none' }}
+                      >
                         Decline
                       </button>
                     </div>
@@ -419,7 +523,7 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
                 ))
               ) : (
                 <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '40px 0' }}>
-                  No pending incoming friend requests.
+                  No pending incoming follow requests.
                 </div>
               )}
             </div>
@@ -429,4 +533,5 @@ export function Peers({ friendships, userEmail, onRefresh, onNavigate }) {
     </motion.div>
   );
 }
+
 export default Peers;

@@ -4,7 +4,6 @@ import {
   DatabaseService, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  sendEmailVerification,
   sendPasswordResetEmail,
   confirmPasswordReset
 } from '../utils/db';
@@ -19,9 +18,6 @@ export function Login({ onLoginSuccess }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  
-  const [verificationPending, setVerificationPending] = useState(false);
-  const [resentStatus, setResentStatus] = useState('');
 
   const [forgotPasswordView, setForgotPasswordView] = useState(null);
   const [resetEmail, setResetEmail] = useState('');
@@ -59,17 +55,9 @@ export function Login({ onLoginSuccess }) {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email.trim(), password);
       const user = userCredential.user;
-
-      if (!user.emailVerified) {
-        await sendEmailVerification(user);
-        setVerificationPending(true);
-        setLoading(false);
-        return;
-      }
-
       onLoginSuccess(user);
     } catch (err) {
-      setError(getFriendlyErrorMessage(err.code));
+      setError(err.message || getFriendlyErrorMessage(err.code));
       setLoading(false);
     }
   };
@@ -90,46 +78,10 @@ export function Login({ onLoginSuccess }) {
       const user = userCredential.user;
 
       await DatabaseService.seedUserData(user.email, fullName.trim());
-
-      await sendEmailVerification(user);
-      setVerificationPending(true);
+      onLoginSuccess(user);
+    } catch (err) {
+      setError(err.message || getFriendlyErrorMessage(err.code));
       setLoading(false);
-    } catch (err) {
-      setError(getFriendlyErrorMessage(err.code));
-      setLoading(false);
-    }
-  };
-
-  const checkVerificationStatus = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        await currentUser.reload();
-        if (currentUser.emailVerified) {
-          onLoginSuccess(currentUser);
-        } else {
-          setError('Email is not verified yet. Please check your inbox.');
-        }
-      }
-    } catch (err) {
-      setError('Error refreshing authentication state.');
-    }
-    setLoading(false);
-  };
-
-  const resendVerification = async () => {
-    setResentStatus('');
-    try {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        await sendEmailVerification(currentUser);
-        setResentStatus('Verification link resent!');
-        setTimeout(() => setResentStatus(''), 4000);
-      }
-    } catch (err) {
-      setError('Failed to resend verification. Please try again later.');
     }
   };
 
@@ -186,66 +138,6 @@ export function Login({ onLoginSuccess }) {
     }
   };
 
-  if (verificationPending) {
-    return (
-      <div className="login-bg-overlay">
-        <div className="login-auth-card nm-out">
-          <div style={{ textAlign: 'center', padding: '10px 0' }}>
-            <EnvelopeOpen size={48} weight="duotone" style={{ color: 'var(--accent)', marginBottom: '20px' }} />
-            <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px', fontFamily: 'var(--font-display)' }}>Verify Your Email</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13.5px', marginBottom: '24px', lineHeight: '1.6' }}>
-              We sent a verification link to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>.<br />
-              Please click the link in your email to activate your account.
-            </p>
-
-            {error && (
-              <div className="alert-box" style={{ marginBottom: '16px' }}>
-                <Warning size={15} />
-                <span>{error}</span>
-              </div>
-            )}
-
-            {resentStatus && (
-              <div className="success-box" style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <CheckCircle size={15} />
-                <span>{resentStatus}</span>
-              </div>
-            )}
-
-            <button 
-              className="cohort-btn cohort-btn-primary" 
-              onClick={checkVerificationStatus}
-              disabled={loading}
-              style={{ width: '100%', justifyContent: 'center', marginBottom: '12px' }}
-            >
-              <span>I've verified my email</span>
-            </button>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '16px' }}>
-              <button 
-                className="cohort-btn" 
-                onClick={resendVerification}
-                style={{ flex: 1, marginRight: '8px', justifyContent: 'center', fontSize: '12px' }}
-              >
-                Resend Link
-              </button>
-              <button 
-                className="cohort-btn" 
-                onClick={() => {
-                  setVerificationPending(false);
-                  setIsRegister(false);
-                }}
-                style={{ flex: 1, marginLeft: '8px', justifyContent: 'center', fontSize: '12px' }}
-              >
-                Back to Login
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (forgotPasswordView === 'sent' || forgotPasswordView === 'done') {
     const isDone = forgotPasswordView === 'done';
     return (
@@ -255,10 +147,12 @@ export function Login({ onLoginSuccess }) {
           <div className="login-auth-card nm-out">
             <div className="login-brand-header">
               <div className="login-brand-row">
-                <div className="login-brand-icon">E</div>
+                <div className="login-brand-icon" style={{ background: 'transparent', boxShadow: 'none', padding: 0 }}>
+                  <img src="/logo96.png" alt="Estudy Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+                </div>
                 <div className="login-brand-text">
                   <h2 className="login-brand-title">Estudy</h2>
-                  <p className="login-brand-tagline">Learn From Home</p>
+                  <p className="login-brand-tagline">Easy Learning</p>
                 </div>
               </div>
             </div>
@@ -333,7 +227,9 @@ export function Login({ onLoginSuccess }) {
           <div className="login-visual-panel" />
           <div className="login-auth-card nm-out">
             <div className="login-brand-header">
-              <div className="login-brand-icon">E</div>
+              <div className="login-brand-icon" style={{ background: 'transparent', boxShadow: 'none', padding: 0, margin: '0 auto 12px auto' }}>
+                <img src="/logo96.png" alt="Estudy Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+              </div>
               <h2 style={{ fontSize: '24px', fontWeight: 800, fontFamily: 'var(--font-display)', color: '#000000' }}>Reset Password</h2>
               <p style={{ fontSize: '12.5px', color: '#000000' }}>Enter your email to receive a reset link</p>
             </div>
@@ -411,7 +307,9 @@ export function Login({ onLoginSuccess }) {
           <div className="login-visual-panel" />
           <div className="login-auth-card nm-out">
             <div className="login-brand-header">
-              <div className="login-brand-icon">E</div>
+              <div className="login-brand-icon" style={{ background: 'transparent', boxShadow: 'none', padding: 0, margin: '0 auto 12px auto' }}>
+                <img src="/logo96.png" alt="Estudy Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+              </div>
               <h2 style={{ fontSize: '24px', fontWeight: 800, fontFamily: 'var(--font-display)', color: '#000000' }}>Set New Password</h2>
               <p style={{ fontSize: '12.5px', color: '#000000' }}>
                 {tokenFromUrl ? 'Enter your new password' : 'Enter the reset token and your new password'}
@@ -512,10 +410,12 @@ export function Login({ onLoginSuccess }) {
         <div className="login-auth-card nm-out">
           <div className="login-brand-header">
             <div className="login-brand-row">
-              <div className="login-brand-icon">E</div>
+              <div className="login-brand-icon" style={{ background: 'transparent', boxShadow: 'none', padding: 0 }}>
+                <img src="/logo96.png" alt="Estudy Logo" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+              </div>
               <div className="login-brand-text">
                 <h2 className="login-brand-title">Estudy</h2>
-                <p className="login-brand-tagline">Learn From Home</p>
+                <p className="login-brand-tagline">Easy Learning</p>
               </div>
             </div>
           </div>

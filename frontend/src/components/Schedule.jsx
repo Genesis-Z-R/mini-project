@@ -1,26 +1,36 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Plus, Trash, CalendarBlank, Warning, Download, MapPin, UploadSimple, CheckCircle } from '@phosphor-icons/react';
+import { Plus, Trash, CalendarBlank, Warning, MapPin, UploadSimple, CheckCircle, Tag, PencilSimple, Clock, BookOpen, CaretUp, CaretDown, CaretLeft, CaretRight } from '@phosphor-icons/react';
 
 export function Schedule({ 
-  courses, 
-  schedule, 
+  courses = [], 
+  schedule = [], 
   onAddScheduleItem, 
   onRemoveScheduleItem,
   onUpdateScheduleItem
 }) {
+  const todayObj = new Date();
+  const todayDateStr = todayObj.toISOString().split('T')[0];
+  const todayDayName = todayObj.toLocaleDateString('en-US', { weekday: 'long' });
+
+  // Selected date in calendar view
+  const [selectedDate, setSelectedDate] = useState(todayDateStr);
+
+  // Modal / Form state
+  const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   
-  // Event Form State
+  // Event Form Fields
   const [name, setName] = useState('');
   const [courseId, setCourseId] = useState('');
+  const [scheduleType, setScheduleType] = useState('CLASS'); // CLASS | STUDY_SESSION | ASSIGNMENT | REMINDER | PERSONAL_EVENT | CUSTOM
+  const [customCategory, setCustomCategory] = useState('');
   const [eventType, setEventType] = useState('repeating'); // 'repeating' or 'onetime'
   const [dayOfWeek, setDayOfWeek] = useState('Monday');
-  const [oneTimeDate, setOneTimeDate] = useState('2026-07-15');
+  const [oneTimeDate, setOneTimeDate] = useState(todayDateStr);
   const [startTime, setStartTime] = useState('09:00');
   const [endTime, setEndTime] = useState('11:00');
   const [room, setRoom] = useState('');
-  const [isClass, setIsClass] = useState(true);
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -28,6 +38,66 @@ export function Schedule({
 
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const hoursOfDay = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'];
+
+  const scheduleTypeOptions = [
+    { value: 'CLASS', label: '🎓 Class', color: '#2563eb' },
+    { value: 'STUDY_SESSION', label: '📖 Study Session', color: '#7c3aed' },
+    { value: 'ASSIGNMENT', label: '📝 Assignment / Task', color: '#d97706' },
+    { value: 'REMINDER', label: '🔔 Reminder', color: '#dc2626' },
+    { value: 'PERSONAL_EVENT', label: '👤 Personal Event', color: '#9333ea' },
+    { value: 'CUSTOM', label: '🏷️ Custom Category...', color: '#059669' }
+  ];
+
+  const changeDateDays = (days) => {
+    const current = new Date(selectedDate);
+    if (isNaN(current.getTime())) return;
+    current.setDate(current.getDate() + days);
+    setSelectedDate(current.toISOString().split('T')[0]);
+  };
+
+  const handleOpenAdd = () => {
+    resetForm();
+    setShowAddModal(true);
+  };
+
+  const handleEditClick = (item) => {
+    setEditingId(item.id);
+    setName(item.name || '');
+    setCourseId(item.courseId === 'none' ? '' : (item.courseId || ''));
+    
+    const type = item.scheduleType || (item.isClass ? 'CLASS' : 'PERSONAL_EVENT');
+    setScheduleType(type);
+    setCustomCategory(item.customCategory || '');
+    
+    setEventType(item.isRepeating ? 'repeating' : 'onetime');
+    if (item.isRepeating) {
+      setDayOfWeek(item.day || 'Monday');
+    } else {
+      setOneTimeDate(item.day || todayDateStr);
+    }
+    setStartTime(item.startTime || '09:00');
+    setEndTime(item.endTime || '11:00');
+    setRoom(item.room || '');
+    setError('');
+    setSuccess('');
+    setShowAddModal(true);
+  };
+
+  const resetForm = () => {
+    setName('');
+    setCourseId('');
+    setScheduleType('CLASS');
+    setCustomCategory('');
+    setEventType('repeating');
+    setDayOfWeek('Monday');
+    setOneTimeDate(todayDateStr);
+    setStartTime('09:00');
+    setEndTime('11:00');
+    setRoom('');
+    setEditingId(null);
+    setError('');
+    setSuccess('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,8 +109,14 @@ export function Schedule({
       return;
     }
 
+    if (scheduleType === 'CUSTOM' && !customCategory.trim()) {
+      setError('Please enter a custom category name.');
+      return;
+    }
+
     const courseObj = courses.find(c => c.id === courseId);
     const dayValue = eventType === 'repeating' ? dayOfWeek : oneTimeDate;
+    const isClass = scheduleType === 'CLASS';
 
     const itemData = {
       name: name.trim(),
@@ -52,56 +128,79 @@ export function Schedule({
       room: room.trim() || (courseObj ? courseObj.room : 'General'),
       isRepeating: eventType === 'repeating',
       repeatFrequency: eventType === 'repeating' ? 'weekly' : 'none',
-      isClass
+      isClass,
+      scheduleType,
+      customCategory: scheduleType === 'CUSTOM' ? customCategory.trim() : null
     };
 
     if (editingId) {
       const result = await onUpdateScheduleItem(editingId, itemData);
-      if (!result.success) {
+      if (result && result.error) {
         setError(result.error);
       } else {
-        setSuccess('Event updated successfully!');
-        setEditingId(null);
-        resetForm();
-        setTimeout(() => setSuccess(''), 3000);
+        setSuccess('Schedule item updated successfully!');
+        setTimeout(() => {
+          setShowAddModal(false);
+          resetForm();
+        }, 1000);
       }
     } else {
       const result = await onAddScheduleItem(itemData);
-      if (!result.success) {
+      if (result && result.error) {
         setError(result.error);
       } else {
-        setSuccess('Event added successfully!');
-        resetForm();
-        setTimeout(() => setSuccess(''), 3000);
+        setSuccess('Schedule item added successfully!');
+        setTimeout(() => {
+          setShowAddModal(false);
+          resetForm();
+        }, 1000);
       }
     }
   };
 
-  const resetForm = () => {
-    setName('');
-    setCourseId('');
-    setRoom('');
-    setEditingId(null);
-    setIsClass(true);
+  // Helper for displaying item classification badge & styling
+  const getItemBadge = (item) => {
+    if (item.scheduleType === 'CUSTOM' && item.customCategory) {
+      return { label: `🏷️ ${item.customCategory}`, bg: '#d1fae5', color: '#047857' };
+    }
+    switch (item.scheduleType) {
+      case 'CLASS':
+        return { label: '🎓 CLASS', bg: '#dbeafe', color: '#1d4ed8' };
+      case 'STUDY_SESSION':
+        return { label: '📖 STUDY SESSION', bg: '#f3e8ff', color: '#7c3aed' };
+      case 'ASSIGNMENT':
+        return { label: '📝 ASSIGNMENT', bg: '#fef3c7', color: '#b45309' };
+      case 'REMINDER':
+        return { label: '🔔 REMINDER', bg: '#fee2e2', color: '#dc2626' };
+      case 'PERSONAL_EVENT':
+        return { label: '👤 PERSONAL', bg: '#fae8ff', color: '#9333ea' };
+      default:
+        return item.isClass 
+          ? { label: '🎓 CLASS', bg: '#dbeafe', color: '#1d4ed8' }
+          : { label: '📅 EVENT', bg: '#f3e8ff', color: '#7c3aed' };
+    }
   };
 
-  const handleEditClick = (item) => {
-    setEditingId(item.id);
-    setName(item.name);
-    setCourseId(item.courseId === 'none' ? '' : item.courseId);
-    setEventType(item.isRepeating ? 'repeating' : 'onetime');
-    if (item.isRepeating) {
-      setDayOfWeek(item.day);
-    } else {
-      setOneTimeDate(item.day);
-    }
-    setStartTime(item.startTime);
-    setEndTime(item.endTime);
-    setRoom(item.room);
-    setIsClass(item.isClass ?? true);
-    setError('');
-    setSuccess('');
+  // Compute selected day details
+  const getSelectedDayName = () => {
+    const dateObj = new Date(selectedDate);
+    if (isNaN(dateObj.getTime())) return 'Today';
+    return dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   };
+
+  const selectedDayWeekday = new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long' });
+
+  // Filter items matching the selected date
+  const selectedDayItems = schedule.filter(item => {
+    if (item.isRepeating) {
+      return item.day === selectedDayWeekday;
+    } else {
+      return item.day === selectedDate;
+    }
+  });
+
+  const selectedClasses = selectedDayItems.filter(item => (item.scheduleType ? item.scheduleType === 'CLASS' : item.isClass));
+  const selectedEvents = selectedDayItems.filter(item => (item.scheduleType ? item.scheduleType !== 'CLASS' : !item.isClass));
 
   // .ics parser implementation
   const handleIcsUpload = (e) => {
@@ -125,17 +224,17 @@ export function Schedule({
 
         for (let item of parsedEvents) {
           const res = await onAddScheduleItem(item);
-          if (res.success) {
+          if (res && res.success !== false) {
             importedCount++;
           } else {
             clashCount++;
           }
         }
 
-        setFileSuccess(`Imported ${importedCount} events successfully!${clashCount > 0 ? ` (${clashCount} events skipped due to scheduling clashes)` : ''}`);
+        setFileSuccess(`Imported ${importedCount} event(s) successfully!${clashCount > 0 ? ` (${clashCount} skipped due to clashes)` : ''}`);
         setTimeout(() => setFileSuccess(''), 6000);
       } catch (err) {
-        setError('Error parsing calendar file. Please ensure it is a valid iCalendar (.ics) file.');
+        setError('Error parsing calendar file. Please ensure it is a valid .ics file.');
       }
     };
     reader.readAsText(file);
@@ -207,16 +306,12 @@ export function Schedule({
         }
       }
 
-      // Check if it sounds like a class/lecture or a generic meeting
       const titleLower = (raw.summary || '').toLowerCase();
       const isAcademic = titleLower.includes('lecture') || 
                          titleLower.includes('class') || 
                          titleLower.includes('lab') || 
                          titleLower.includes('tutorial') || 
-                         titleLower.includes('seminar') || 
-                         titleLower.includes('course') || 
-                         titleLower.includes('practical') || 
-                         titleLower.includes('exam');
+                         titleLower.includes('course');
 
       return {
         name: raw.summary,
@@ -227,7 +322,8 @@ export function Schedule({
         isRepeating,
         repeatFrequency,
         courseId: 'none',
-        isClass: isAcademic
+        isClass: isAcademic,
+        scheduleType: isAcademic ? 'CLASS' : 'PERSONAL_EVENT'
       };
     });
   };
@@ -238,19 +334,19 @@ export function Schedule({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      {/* Title & Top Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>My Schedule</h2>
+          <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>Schedule & Calendar Management</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-            Plan repeating weekly classes or one-time events.
+            Manage classes, study sessions, assignments, reminders, and custom schedule events.
           </p>
         </div>
 
-        {/* .ics Upload */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <label className="cohort-btn" style={{ gap: '8px', cursor: 'pointer' }}>
             <UploadSimple size={16} weight="bold" />
-            <span>Import Calendar (.ics)</span>
+            <span>Import (.ics)</span>
             <input 
               type="file" 
               accept=".ics" 
@@ -258,6 +354,15 @@ export function Schedule({
               style={{ display: 'none' }}
             />
           </label>
+
+          <button 
+            onClick={handleOpenAdd}
+            className="cohort-btn cohort-btn-primary"
+            style={{ gap: '6px' }}
+          >
+            <Plus size={16} weight="bold" />
+            <span>Add Schedule Item</span>
+          </button>
         </div>
       </div>
 
@@ -268,73 +373,289 @@ export function Schedule({
         </div>
       )}
 
-      <div className="schedule-layout">
-        {/* Left Side: Daily Timeline */}
-        <div className="schedule-timeline-card nm-out">
-          <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <CalendarBlank size={18} />
-            Hourly Grid Blocks
-          </h3>
+      {/* Main Schedule Grid: Calendar View & Day Breakdown */}
+      <div className="schedule-main-split" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px', alignItems: 'flex-start' }}>
+        {/* Left Side: Selected Date Breakdown (Classes vs Events) */}
+        <div>
+          {/* Day Header Bar */}
+          <div className="cohort-card nm-out" style={{ padding: '20px 24px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <CalendarBlank size={24} style={{ color: 'var(--accent)' }} />
+              <div>
+                <h3 style={{ fontSize: '18px', fontWeight: '800', margin: 0, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                  {getSelectedDayName()}
+                </h3>
+                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  {selectedClasses.length} Class(es) • {selectedEvents.length} Event(s)
+                </span>
+              </div>
+            </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {hoursOfDay.map(hour => {
-              const hourNum = parseInt(hour.split(':')[0], 10);
-              
-              // Filter events happening at this hour
-              const activeEvents = schedule.filter(item => {
-                const startHour = parseInt(item.startTime.split(':')[0], 10);
-                const endHour = parseInt(item.endTime.split(':')[0], 10);
-                return hourNum >= startHour && hourNum < endHour;
-              });
+            {/* Custom Styled Date Picker Control Bar with Up & Down Arrow Steppers */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-secondary)' }}>Select Date:</span>
+              <div className="date-picker-control-bar">
+                <button 
+                  type="button" 
+                  className="date-stepper-btn" 
+                  onClick={() => changeDateDays(-1)} 
+                  title="Previous Day (Step Back)"
+                >
+                  <CaretDown size={15} weight="bold" />
+                </button>
 
-              return (
-                <div key={hour} className="schedule-hour-row">
-                  <span className="schedule-hour-label">{hour}</span>
-                  <div className="schedule-events-container">
-                    {activeEvents.map(item => (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input 
+                    type="date" 
+                    className="date-picker-custom-input" 
+                    value={selectedDate}
+                    onChange={e => setSelectedDate(e.target.value)}
+                  />
+                </div>
+
+                <button 
+                  type="button" 
+                  className="date-stepper-btn" 
+                  onClick={() => changeDateDays(1)} 
+                  title="Next Day (Step Forward)"
+                >
+                  <CaretUp size={15} weight="bold" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Group 1: Classes */}
+          <div className="cohort-card nm-out" style={{ padding: '24px', marginBottom: '24px' }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '18px', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🎓 Classes</span>
+              <span style={{ fontSize: '12px', background: 'var(--badge-blue-bg)', color: 'var(--badge-blue-text)', padding: '2px 10px', borderRadius: '12px', fontWeight: '700' }}>
+                {selectedClasses.length}
+              </span>
+            </h4>
+
+            {selectedClasses.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {selectedClasses.map(item => {
+                  const badge = getItemBadge(item);
+                  return (
+                    <motion.div 
+                      key={item.id} 
+                      className="event-card-premium"
+                      whileHover={{ y: -2 }}
+                    >
                       <div 
-                        key={item.id} 
-                        className={`schedule-event-block ${
-                          item.isClass ? 'green' : 'blue'
-                        } nm-out`}
-                        onClick={() => handleEditClick(item)}
-                        style={{ cursor: 'pointer' }}
-                        title="Click to edit event"
-                      >
-                        <div>
-                          <strong style={{ display: 'block', color: 'var(--text-primary)' }}>
-                            {item.name} {item.isClass ? ' (Class)' : ' (Event/Task)'}
-                          </strong>
-                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                            {item.startTime} - {item.endTime} | {item.room} ({item.day})
+                        className="event-card-accent-stripe" 
+                        style={{ background: badge.color }} 
+                      />
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, paddingRight: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <span className="event-card-badge" style={{ background: badge.bg, color: badge.color }}>
+                            {badge.label}
+                          </span>
+                          <h5 style={{ fontSize: '15px', fontWeight: '800', margin: 0, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                            {item.name}
+                          </h5>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <span className="event-card-pill">
+                            <Clock size={14} style={{ color: badge.color }} />
+                            <span>{item.startTime} - {item.endTime}</span>
+                          </span>
+
+                          {item.room && (
+                            <span className="event-card-pill">
+                              <MapPin size={14} style={{ color: 'var(--accent)' }} />
+                              <span>{item.room}</span>
+                            </span>
+                          )}
+
+                          <span className="event-card-pill" style={{ opacity: 0.85 }}>
+                            <span>{item.isRepeating ? `Weekly: ${item.day}` : `Date: ${item.day}`}</span>
                           </span>
                         </div>
-                        <button
-                          className="cohort-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        <button 
+                          className="icon-action-btn"
+                          onClick={() => handleEditClick(item)}
+                          title="Edit class"
+                        >
+                          <PencilSimple size={16} style={{ color: 'var(--text-secondary)' }} />
+                        </button>
+                        <button 
+                          className="icon-action-btn danger"
+                          onClick={() => {
+                            if (confirm(`Remove class "${item.name}"?`)) {
+                              onRemoveScheduleItem(item.id);
+                            }
+                          }}
+                          title="Delete class"
+                        >
+                          <Trash size={16} style={{ color: 'var(--text-tertiary)' }} />
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '30px 0' }}>
+                No classes scheduled for {selectedDayWeekday}.
+              </div>
+            )}
+          </div>
+
+          {/* Group 2: Events & Non-Class Items */}
+          <div className="cohort-card nm-out" style={{ padding: '24px' }}>
+            <h4 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '18px', color: '#059669', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>📅 Events & Tasks</span>
+              <span style={{ fontSize: '12px', background: '#d1fae5', color: '#047857', padding: '2px 10px', borderRadius: '12px', fontWeight: '700' }}>
+                {selectedEvents.length}
+              </span>
+            </h4>
+
+            {selectedEvents.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                {selectedEvents.map(item => {
+                  const badge = getItemBadge(item);
+                  return (
+                    <motion.div 
+                      key={item.id} 
+                      className="event-card-premium"
+                      whileHover={{ y: -2 }}
+                    >
+                      <div 
+                        className="event-card-accent-stripe" 
+                        style={{ background: badge.color }} 
+                      />
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, paddingRight: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <span className="event-card-badge" style={{ background: badge.bg, color: badge.color }}>
+                            {badge.label}
+                          </span>
+                          <h5 style={{ fontSize: '15px', fontWeight: '800', margin: 0, color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                            {item.name}
+                          </h5>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                          <span className="event-card-pill">
+                            <Clock size={14} style={{ color: badge.color }} />
+                            <span>{item.startTime} - {item.endTime}</span>
+                          </span>
+
+                          {item.room && (
+                            <span className="event-card-pill">
+                              <MapPin size={14} style={{ color: 'var(--accent)' }} />
+                              <span>{item.room}</span>
+                            </span>
+                          )}
+
+                          <span className="event-card-pill" style={{ opacity: 0.85 }}>
+                            <span>{item.isRepeating ? `Weekly: ${item.day}` : `Date: ${item.day}`}</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+                        <button 
+                          className="icon-action-btn"
+                          onClick={() => handleEditClick(item)}
+                          title="Edit event"
+                        >
+                          <PencilSimple size={16} style={{ color: 'var(--text-secondary)' }} />
+                        </button>
+                        <button 
+                          className="icon-action-btn danger"
+                          onClick={() => {
                             if (confirm(`Remove event "${item.name}"?`)) {
                               onRemoveScheduleItem(item.id);
                             }
                           }}
-                          style={{ padding: '6px', border: 'none', background: 'transparent', boxShadow: 'none' }}
+                          title="Delete event"
                         >
-                          <Trash size={14} style={{ color: 'var(--text-tertiary)' }} />
+                          <Trash size={16} style={{ color: 'var(--text-tertiary)' }} />
                         </button>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                    </motion.div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '30px 0' }}>
+                No events or tasks scheduled for {selectedDayWeekday}.
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Right Side: Event Form */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          <div className="schedule-calendar-widget nm-out">
-            <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '20px' }}>
-              {editingId ? 'Edit Event Details' : 'Schedule Custom Event'}
+        {/* Right Side: Full Weekly Timeline View */}
+        <div>
+          <div className="schedule-timeline-card nm-out">
+            <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Clock size={18} />
+              Hourly Grid Overview
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '540px', overflowY: 'auto' }}>
+              {hoursOfDay.map(hour => {
+                const hourNum = parseInt(hour.split(':')[0], 10);
+                const activeHourEvents = selectedDayItems.filter(item => {
+                  const startHour = parseInt(item.startTime.split(':')[0], 10);
+                  const endHour = parseInt(item.endTime.split(':')[0], 10);
+                  return hourNum >= startHour && hourNum < endHour;
+                });
+
+                return (
+                  <div key={hour} className="schedule-hour-row">
+                    <span className="schedule-hour-label">{hour}</span>
+                    <div className="schedule-events-container">
+                      {activeHourEvents.map(item => {
+                        const badge = getItemBadge(item);
+                        return (
+                          <div 
+                            key={item.id} 
+                            className="schedule-event-block nm-out"
+                            onClick={() => handleEditClick(item)}
+                            style={{ 
+                              cursor: 'pointer',
+                              background: badge.bg,
+                              borderLeft: `3px solid ${badge.color}`,
+                              color: badge.color
+                            }}
+                            title="Click to edit event"
+                          >
+                            <div>
+                              <strong style={{ display: 'block', fontSize: '12px' }}>
+                                {item.name}
+                              </strong>
+                              <span style={{ fontSize: '10px', opacity: 0.85 }}>
+                                {item.startTime} - {item.endTime} ({badge.label})
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Event Creation / Edit Modal Dialog */}
+      {showAddModal && (
+        <div className="quiz-modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="quiz-modal" style={{ maxWidth: '480px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '20px', textAlign: 'center' }}>
+              {editingId ? 'Edit Schedule Item' : 'Add Schedule Item'}
             </h3>
 
             {error && (
@@ -351,17 +672,49 @@ export function Schedule({
             )}
 
             <form onSubmit={handleSubmit}>
+              {/* Classification Select */}
               <div className="form-group">
-                <label className="form-label">Event Name</label>
+                <label className="form-label">Classification / Type</label>
+                <select 
+                  className="cohort-select" 
+                  value={scheduleType} 
+                  onChange={e => setScheduleType(e.target.value)}
+                >
+                  {scheduleTypeOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Custom Category Input (If CUSTOM selected) */}
+              {scheduleType === 'CUSTOM' && (
+                <div className="form-group">
+                  <label className="form-label">Custom Category Name</label>
+                  <input 
+                    type="text" 
+                    className="cohort-input" 
+                    placeholder="e.g. Exam Prep, Lab Work, Project" 
+                    value={customCategory} 
+                    onChange={e => setCustomCategory(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
+              {/* Event Title */}
+              <div className="form-group">
+                <label className="form-label">Event Title</label>
                 <input 
                   type="text" 
                   className="cohort-input" 
-                  placeholder="e.g. Embedded Labs" 
+                  placeholder="e.g. Database Systems Lecture" 
                   value={name} 
                   onChange={e => setName(e.target.value)}
+                  required
                 />
               </div>
 
+              {/* Linked Course (Optional) */}
               <div className="form-group">
                 <label className="form-label">Linked Course (Optional)</label>
                 <select className="cohort-select" value={courseId} onChange={e => setCourseId(e.target.value)}>
@@ -372,19 +725,7 @@ export function Schedule({
                 </select>
               </div>
 
-              <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '14px 0' }}>
-                <input 
-                  type="checkbox" 
-                  id="isClassCheck" 
-                  checked={isClass} 
-                  onChange={e => setIsClass(e.target.checked)} 
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }} 
-                />
-                <label htmlFor="isClassCheck" className="form-label" style={{ margin: 0, cursor: 'pointer', fontWeight: '700' }}>
-                  Mark as Class session (shows in Dashboard Classes feed)
-                </label>
-              </div>
-
+              {/* Frequency */}
               <div className="form-group">
                 <label className="form-label">Frequency</label>
                 <div style={{ display: 'flex', gap: '12px' }}>
@@ -407,6 +748,7 @@ export function Schedule({
                 </div>
               </div>
 
+              {/* Day / Date */}
               {eventType === 'repeating' ? (
                 <div className="form-group">
                   <label className="form-label">Day of Week</label>
@@ -428,6 +770,7 @@ export function Schedule({
                 </div>
               )}
 
+              {/* Times */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div className="form-group">
                   <label className="form-label">Start Time</label>
@@ -439,32 +782,38 @@ export function Schedule({
                 </div>
               </div>
 
+              {/* Room / Location */}
               <div className="form-group">
-                <label className="form-label">Venue / Room</label>
+                <label className="form-label">Location / Room</label>
                 <input 
                   type="text" 
                   className="cohort-input" 
-                  placeholder="e.g. Lab 3B, Zoom" 
+                  placeholder="e.g. Lab 3B, Zoom, Library" 
                   value={room} 
                   onChange={e => setRoom(e.target.value)}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
                 <button type="submit" className="cohort-btn cohort-btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
-                  {editingId ? 'Update Event' : 'Add to Calendar'}
+                  {editingId ? 'Update Event' : 'Save to Schedule'}
                 </button>
-                {editingId && (
-                  <button type="button" className="cohort-btn" onClick={resetForm}>
-                    Cancel
-                  </button>
-                )}
+                <button 
+                  type="button" 
+                  className="cohort-btn" 
+                  onClick={() => setShowAddModal(false)}
+                  style={{ flex: 1, justifyContent: 'center' }}
+                >
+                  Cancel
+                </button>
               </div>
             </form>
           </div>
         </div>
-      </div>
+      )}
     </motion.div>
   );
 }
+
 export default Schedule;

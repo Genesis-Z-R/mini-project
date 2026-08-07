@@ -7,20 +7,22 @@ export function Sidebar({ currentTab, setCurrentTab, user, onSignOut, className 
     { id: 'dashboard', label: 'Dashboard', icon: SquaresFour },
     { id: 'courses', label: 'My Courses', icon: GraduationCap },
     { id: 'schedule', label: 'Schedule', icon: Calendar },
-    { id: 'peers', label: 'Peers', icon: UsersThree },
+    { id: 'peers', label: 'Find Peers', icon: UsersThree },
     { id: 'global_search', label: 'Global Search', icon: Globe },
     { id: 'profile', label: 'Profile', icon: User },
-    { id: 'setting', label: 'Setting', icon: Gear }
+    { id: 'setting', label: 'Settings', icon: Gear }
   ];
 
   return (
     <aside className={`estudy-sidebar ${className || ''}`}>
       {/* Brand Header */}
       <div className="estudy-logo-area">
-        <div className="estudy-logo-icon">E</div>
+        <div className="estudy-logo-icon" style={{ background: 'transparent', boxShadow: 'none', padding: 0 }}>
+          <img src="/logo96.png" alt="Estudy Logo" style={{ width: '38px', height: '38px', objectFit: 'contain' }} />
+        </div>
         <div className="estudy-logo-text">
           <span className="brand-title">Estudy</span>
-          <span className="brand-tagline">Learn From Home</span>
+          <span className="brand-tagline">Easy Learning</span>
         </div>
       </div>
 

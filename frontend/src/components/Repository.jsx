@@ -1,147 +1,183 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
-  Plus, Trash, Warning, Download, MagnifyingGlass, Eye, EyeSlash, FilePdf, FileImage, Video, Link as LinkIcon, BookOpen, CheckCircle, Spinner, FileDoc 
+  FilePdf, FileImage, Video, FileDoc, BookOpen, Plus, Trash, Globe, Lock, Download, 
+  MagnifyingGlass, CheckCircle, Warning, Spinner, GraduationCap, Sparkle, Funnel, Clock
 } from '@phosphor-icons/react';
 import { DatabaseService } from '../utils/db';
 
 export function Repository({ 
-  courses, 
-  files, 
-  userEmail, 
+  courses = [], 
+  files = [], 
+  userEmail = '', 
   onAddFile, 
   onDeleteFile, 
-  onToggleFileVisibility, 
+  onToggleFileVisibility,
   onRefresh,
+  courseId,
   nestedMode = false,
   initialSubTab = 'mine'
 }) {
-  const [activeSubTab, setActiveSubTab] = useState(initialSubTab);
+  const [activeSubTab, setActiveSubTab] = useState(initialSubTab); // 'mine' | 'global_search'
   const [activeCategory, setActiveCategory] = useState('all');
-
-  // File Upload Form State
-  const [title, setTitle] = useState('');
-  const [courseId, setCourseId] = useState(courses[0]?.id || '');
-  const [fileType, setFileType] = useState('pdf');
   const [selectedFile, setSelectedFile] = useState(null);
-  const [isPublic, setIsPublic] = useState(true);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [success, setSuccess] = useState('');
+  const [error, setError] = useState('');
 
-  // Global Search State
+  // Upload Form State
+  const [fileTitle, setFileTitle] = useState('');
+  const [selectedCourseId, setSelectedCourseId] = useState(courseId || 'none');
+  const [fileType, setFileType] = useState('pdf');
+  const [isPublic, setIsPublic] = useState(true);
+
+  // Global Search State & Filters
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [globalSearchResults, setGlobalSearchResults] = useState([]);
   const [searched, setSearched] = useState(false);
+  const [searching, setSearching] = useState(false);
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const [filterProgrammeOnly, setFilterProgrammeOnly] = useState(false);
+  const [filterSameCourseOnly, setFilterSameCourseOnly] = useState(false);
+  const [filterFileType, setFilterFileType] = useState('ALL');
+  const [filterRecentOnly, setFilterRecentOnly] = useState(false);
 
-    setSelectedFile(file);
-    // Auto-detect type
-    const ext = file.name.split('.').pop().toLowerCase();
-    if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
-      setFileType('image');
-    } else if (['mp4', 'mov', 'avi', 'mkv', 'webm'].includes(ext)) {
-      setFileType('video');
-    } else if (['docx', 'doc'].includes(ext)) {
-      setFileType('docx');
-    } else {
-      setFileType('pdf'); // Default standard document
+  useEffect(() => {
+    if (courseId) {
+      setSelectedCourseId(courseId);
     }
+  }, [courseId]);
 
-    if (!title.trim()) {
-      // Auto-fill title with filename without extension
-      const nameWithoutExt = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-      setTitle(nameWithoutExt);
+  // Execute global search whenever query or filters change
+  const executeGlobalSearch = async (queryToUse = globalSearchQuery) => {
+    if (!queryToUse.trim()) {
+      setGlobalSearchResults([]);
+      setSearched(false);
+      return;
+    }
+    setSearching(true);
+    try {
+      const results = await DatabaseService.searchGlobalPublicFiles(queryToUse, userEmail, {
+        programmeOnly: filterProgrammeOnly,
+        sameCourseOnly: filterSameCourseOnly,
+        fileType: filterFileType,
+        recentOnly: filterRecentOnly
+      });
+      setGlobalSearchResults(results || []);
+      setSearched(true);
+    } catch (err) {
+      console.error("Global search error:", err);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSubTab === 'global_search') {
+      if (globalSearchQuery.trim()) {
+        executeGlobalSearch();
+      } else {
+        setGlobalSearchResults([]);
+        setSearched(false);
+      }
+    }
+  }, [activeSubTab, globalSearchQuery, filterProgrammeOnly, filterSameCourseOnly, filterFileType, filterRecentOnly]);
+
+  const handleGlobalSearchSubmit = (e) => {
+    e.preventDefault();
+    executeGlobalSearch();
+  };
+
+  const showNotification = (msg, isSuccess = true) => {
+    if (isSuccess) {
+      setSuccess(msg);
+      setTimeout(() => setSuccess(''), 3000);
+    } else {
+      setError(msg);
+      setTimeout(() => setError(''), 3000);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      if (!fileTitle) {
+        setFileTitle(file.name.replace(/\.[^/.]+$/, ""));
+      }
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (['png', 'jpg', 'jpeg', 'webp', 'svg'].includes(ext)) setFileType('image');
+      else if (['mp4', 'mov', 'avi', 'mkv'].includes(ext)) setFileType('video');
+      else if (['doc', 'docx'].includes(ext)) setFileType('docx');
+      else setFileType('pdf');
     }
   };
 
   const handleUploadSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
-
     if (!selectedFile) {
-      setError('Please select an actual file to upload.');
+      showNotification("Please select a physical file to upload.", false);
       return;
     }
-    if (!title.trim()) {
-      setError('Please enter a resource title.');
+    if (!fileTitle.trim()) {
+      showNotification("Please provide a title for the resource.", false);
       return;
     }
 
     setUploading(true);
     try {
-      // 1. Upload actual file to Supabase Storage
-      const { publicUrl, size } = await DatabaseService.uploadFileToStorage(selectedFile);
-      
-      // Calculate human-readable size
-      const sizeStr = (size < 1024 * 1024) 
-        ? (size / 1024).toFixed(1) + ' KB' 
-        : (size / (1024 * 1024)).toFixed(1) + ' MB';
-
-      // 2. Save metadata reference in files table
-      const linkedCourse = nestedMode ? courses[0]?.id : (courseId || 'none');
-      await onAddFile({
-        title: title.trim(),
-        courseId: linkedCourse,
+      const storageResult = await DatabaseService.uploadFileToStorage(selectedFile);
+      const newFileObj = {
+        title: fileTitle.trim(),
+        courseId: selectedCourseId || 'none',
         fileType,
-        size: sizeStr,
+        size: storageResult.sizeStr,
+        downloads: 0,
         isPublic,
-        url: publicUrl
-      });
+        uploadDate: new Date().toISOString().split('T')[0],
+        userId: userEmail,
+        url: storageResult.publicUrl
+      };
 
-      setSuccess('Resource uploaded successfully to Storage!');
-      setTitle('');
+      await onAddFile(newFileObj);
+      showNotification(`"${fileTitle}" uploaded successfully!`);
+
       setSelectedFile(null);
-      
-      // Reset file input
-      const fileInput = document.getElementById('actual-file-picker');
-      if (fileInput) fileInput.value = '';
-
-      setTimeout(() => setSuccess(''), 3000);
-      if (onRefresh) onRefresh();
+      setFileTitle('');
+      setIsPublic(true);
     } catch (err) {
-      console.error(err);
-      setError('Upload failed. Please check your storage settings.');
+      showNotification(err.message || "Failed to upload file to storage.", false);
     } finally {
       setUploading(false);
-    }
-  };
-
-  const handleGlobalSearch = async (e) => {
-    e.preventDefault();
-    if (!globalSearchQuery.trim()) return;
-
-    try {
-      const results = await DatabaseService.searchGlobalPublicFiles(globalSearchQuery.trim());
-      setGlobalSearchResults(results);
-      setSearched(true);
-    } catch (err) {
-      console.error("Global search error:", err);
     }
   };
 
   const handleCopyResource = async (file) => {
     try {
       await DatabaseService.addPublicFileToMine(file, userEmail);
-      setSuccess(`"${file.title}" has been added to your My Resources folder!`);
-      if (onRefresh) onRefresh();
-      setTimeout(() => setSuccess(''), 3000);
+      showNotification(`"${file.title}" added to your My Resources folder!`);
+      onRefresh();
     } catch (err) {
-      setError('Error copying resource to your list.');
-      setTimeout(() => setError(''), 3000);
+      showNotification("Failed to add resource.", false);
     }
   };
 
   const handleDownload = (file) => {
     if (file.url) {
-      window.open(file.url, '_blank');
+      const a = document.createElement('a');
+      a.href = file.url;
+      a.target = '_blank';
+      a.download = file.title;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } else {
-      // Fallback mock download
-      const fileContent = `Estudy Resource Reference\nTitle: ${file.title}\nSize: ${file.size}\n`;
+      const fileContent = `Estudy Resource Document\n` +
+        `Title: ${file.title}\n` +
+        `Course: ${file.courseId}\n` +
+        `Size: ${file.size}\n` +
+        `Uploaded by: ${file.uploaderName || file.userId}\n`;
+
       const blob = new Blob([fileContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -154,7 +190,6 @@ export function Repository({
     }
   };
 
-  // Filter user's files
   const filteredMyFiles = files.filter(f => {
     if (activeCategory === 'all') return true;
     return f.fileType === activeCategory;
@@ -176,7 +211,6 @@ export function Repository({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
-      {/* Sub Tab Switcher - Only display if not nested and not forced global search tab */}
       {!nestedMode && initialSubTab !== 'global_search' && (
         <div className="timetable-toggle-container" style={{ marginBottom: '24px' }}>
           <div className="timetable-toggle-bar">
@@ -211,9 +245,7 @@ export function Repository({
       )}
 
       {activeSubTab === 'mine' ? (
-        /* ============================================================
-           MY RESOURCES VIEW (NESTED INSIDE A COURSE)
-           ============================================================ */
+        /* MY RESOURCES VIEW */
         <div>
           {!nestedMode && (
             <div style={{ marginBottom: '24px' }}>
@@ -225,7 +257,6 @@ export function Repository({
           )}
 
           <div className="timetable-split-layout">
-            {/* File list card */}
             <div className="cohort-card nm-out" style={{ padding: '24px' }}>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', overflowX: 'auto' }}>
                 {['all', 'pdf', 'image', 'video', 'docx'].map(cat => (
@@ -243,95 +274,106 @@ export function Repository({
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {filteredMyFiles.length > 0 ? (
                   filteredMyFiles.map(file => (
-                    <div key={file.id} style={{ display: 'flex', justify: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'var(--bg-navigation)', borderRadius: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        {getIcon(file.fileType)}
-                        <div>
-                          <strong style={{ fontSize: '13.5px', display: 'block', color: 'var(--text-primary)' }}>{file.title}</strong>
-                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                            {file.size} • {file.fileType.toUpperCase()} • {file.uploadDate}
-                          </span>
+                    <div key={file.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'var(--bg-navigation)', borderRadius: '12px', gap: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', borderRadius: '10px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', flexShrink: 0 }}>
+                          {getIcon(file.fileType)}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <strong style={{ fontSize: '14px', display: 'block', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {file.title}
+                          </strong>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                            <span>{file.size}</span>
+                            <span>•</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: file.isPublic ? 'var(--accent)' : 'var(--text-tertiary)' }}>
+                              {file.isPublic ? <Globe size={12} /> : <Lock size={12} />}
+                              {file.isPublic ? 'Public' : 'Private'}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <button
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button 
                           className="cohort-btn"
                           onClick={() => onToggleFileVisibility(file.id, !file.isPublic)}
-                          title={file.isPublic ? 'Globally searchable by anyone' : 'Private to me'}
-                          style={{ padding: '6px', border: 'none', background: 'transparent', boxShadow: 'none' }}
+                          title={file.isPublic ? "Make Private" : "Make Public"}
+                          style={{ padding: '6px 10px', fontSize: '11px' }}
                         >
-                          {file.isPublic ? (
-                            <Eye size={16} style={{ color: 'var(--accent)' }} />
-                          ) : (
-                            <EyeSlash size={16} style={{ color: 'var(--text-tertiary)' }} />
-                          )}
+                          {file.isPublic ? 'Privacy' : 'Share'}
                         </button>
-
                         <button 
-                          className="cohort-btn" 
+                          className="cohort-btn"
                           onClick={() => handleDownload(file)}
-                          title="Open or Download file"
+                          style={{ padding: '6px' }}
+                          title="Download File"
                         >
                           <Download size={14} weight="bold" />
                         </button>
-
                         <button 
-                          className="cohort-btn" 
-                          onClick={() => {
-                            if (confirm(`Are you sure you want to delete "${file.title}"?`)) {
-                              onDeleteFile(file.id, file.url);
-                            }
-                          }}
-                          style={{ padding: '6px', border: 'none', background: 'transparent', boxShadow: 'none' }}
+                          className="cohort-btn"
+                          onClick={() => onDeleteFile(file.id)}
+                          style={{ padding: '6px', color: '#EF4444' }}
+                          title="Delete File"
                         >
-                          <Trash size={15} style={{ color: 'var(--text-tertiary)' }} />
+                          <Trash size={14} weight="bold" />
                         </button>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '60px 0' }}>
-                    No files uploaded yet. Select a file on the right to start!
+                  <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '40px 0' }}>
+                    No files found in this category. Use the upload panel to add files!
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Upload form card */}
+            {/* UPLOAD FORM */}
             <div className="cohort-card nm-out" style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '20px' }}>Upload Study File</h3>
+              <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>
+                Upload Resource
+              </h3>
 
               <form onSubmit={handleUploadSubmit}>
-                <div className="form-group">
-                  <label className="form-label">Select File</label>
+                <div className="form-group" style={{ marginBottom: '14px' }}>
+                  <label className="form-label">Select Local File</label>
                   <input 
                     type="file" 
-                    id="actual-file-picker"
-                    className="cohort-input" 
-                    onChange={handleFileChange}
+                    onChange={handleFileSelect}
+                    className="cohort-input"
                     style={{ padding: '8px' }}
                     required
                   />
+                  {selectedFile && (
+                    <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginTop: '4px', display: 'block' }}>
+                      Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                    </span>
+                  )}
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Resource Title</label>
+                <div className="form-group" style={{ marginBottom: '14px' }}>
+                  <label className="form-label">Document Title</label>
                   <input 
                     type="text" 
                     className="cohort-input" 
-                    placeholder="Chapter 2 slides..." 
-                    value={title} 
-                    onChange={e => setTitle(e.target.value)}
+                    placeholder="e.g. Chapter 3 Summary Notes" 
+                    value={fileTitle}
+                    onChange={e => setFileTitle(e.target.value)}
                     required
                   />
                 </div>
 
                 {!nestedMode && (
-                  <div className="form-group">
-                    <label className="form-label">Linked Course</label>
-                    <select className="cohort-select" value={courseId} onChange={e => setCourseId(e.target.value)}>
-                      <option value="">None / General Reference</option>
+                  <div className="form-group" style={{ marginBottom: '14px' }}>
+                    <label className="form-label">Associate Course</label>
+                    <select 
+                      className="cohort-select" 
+                      value={selectedCourseId}
+                      onChange={e => setSelectedCourseId(e.target.value)}
+                    >
+                      <option value="none">General / No Course</option>
                       {courses.map(c => (
                         <option key={c.id} value={c.id}>{c.code} - {c.name}</option>
                       ))}
@@ -339,7 +381,7 @@ export function Repository({
                   </div>
                 )}
 
-                <div className="form-group">
+                <div className="form-group" style={{ marginBottom: '14px' }}>
                   <label className="form-label">Detected Type</label>
                   <select className="cohort-select" value={fileType} onChange={e => setFileType(e.target.value)}>
                     <option value="pdf">PDF Document</option>
@@ -385,65 +427,157 @@ export function Repository({
           </div>
         </div>
       ) : (
-        /* ============================================================
-           GLOBAL PUBLIC SEARCH VIEW
-           ============================================================ */
+        /* GLOBAL ACADEMIC RESOURCE SEARCH VIEW */
         <div>
           <div style={{ marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>Global Public Search</h2>
+            <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '4px' }}>Global Academic Resource Search</h2>
             <p style={{ color: 'var(--text-secondary)', fontSize: '14px' }}>
-              Search globally shared materials uploaded by any student on Estudy.
+              Search academic materials prioritized by programme relevance, course match, and search keywords.
             </p>
           </div>
 
           <div className="cohort-card nm-out" style={{ padding: '24px' }}>
-            <form onSubmit={handleGlobalSearch} style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+            {/* Search Input Bar */}
+            <form onSubmit={handleGlobalSearchSubmit} className="global-search-bar-container" style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
               <input 
                 type="text" 
                 className="cohort-input" 
-                placeholder="e.g. introduction to economics" 
+                placeholder="Search resources by title or course code (e.g., Database Notes, CSM 352)..." 
                 value={globalSearchQuery}
                 onChange={e => setGlobalSearchQuery(e.target.value)}
                 style={{ flex: 1 }}
-                required
               />
-              <button type="submit" className="cohort-btn cohort-btn-primary" style={{ gap: '8px' }}>
+              <button type="submit" className="cohort-btn cohort-btn-primary" style={{ gap: '8px', padding: '10px 20px' }}>
                 <MagnifyingGlass size={16} weight="bold" />
-                <span>Search Resources</span>
+                <span>Search</span>
               </button>
             </form>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {globalSearchResults.length > 0 ? (
+            {/* Filter Control Bar */}
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center', padding: '12px 16px', background: 'var(--bg-navigation)', borderRadius: '10px', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                <Funnel size={14} />
+                <span>Filters:</span>
+              </div>
+
+              {/* Same Programme Filter */}
+              <button
+                type="button"
+                className={`cohort-btn ${filterProgrammeOnly ? 'cohort-btn-primary' : ''}`}
+                onClick={() => setFilterProgrammeOnly(!filterProgrammeOnly)}
+                style={{ fontSize: '11.5px', padding: '4px 10px', borderRadius: '6px' }}
+              >
+                🎓 Same Programme Only
+              </button>
+
+              {/* Same Course Filter */}
+              <button
+                type="button"
+                className={`cohort-btn ${filterSameCourseOnly ? 'cohort-btn-primary' : ''}`}
+                onClick={() => setFilterSameCourseOnly(!filterSameCourseOnly)}
+                style={{ fontSize: '11.5px', padding: '4px 10px', borderRadius: '6px' }}
+              >
+                📚 Same Course Only
+              </button>
+
+              {/* Recently Uploaded Filter */}
+              <button
+                type="button"
+                className={`cohort-btn ${filterRecentOnly ? 'cohort-btn-primary' : ''}`}
+                onClick={() => setFilterRecentOnly(!filterRecentOnly)}
+                style={{ fontSize: '11.5px', padding: '4px 10px', borderRadius: '6px' }}
+              >
+                <Clock size={12} />
+                <span>Recently Uploaded (30 Days)</span>
+              </button>
+
+              {/* File Type Filter */}
+              <select
+                className="cohort-select"
+                value={filterFileType}
+                onChange={e => setFilterFileType(e.target.value)}
+                style={{ fontSize: '11.5px', padding: '4px 8px', width: 'auto' }}
+              >
+                <option value="ALL">All File Types</option>
+                <option value="pdf">PDF Documents</option>
+                <option value="docx">Word (.docx)</option>
+                <option value="image">Images</option>
+                <option value="video">Videos</option>
+              </select>
+            </div>
+
+            {/* Search Results List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {searching ? (
+                <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '13px', padding: '40px 0' }}>
+                  Scanning globally shared study repository...
+                </div>
+              ) : globalSearchResults.length > 0 ? (
                 globalSearchResults.map(file => {
                   const isOwnFile = file.userId === userEmail;
                   return (
-                    <div key={file.id} style={{ display: 'flex', justify: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'var(--bg-navigation)', borderRadius: '12px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                        {getIcon(file.fileType)}
-                        <div>
-                          <strong style={{ fontSize: '13.5px', display: 'block', color: 'var(--text-primary)' }}>{file.title}</strong>
-                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                            {file.size} • {file.fileType.toUpperCase()} • Shared by: {file.userId}
-                          </span>
+                    <div key={file.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', background: 'var(--bg-navigation)', borderRadius: '12px', gap: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flex: 1 }}>
+                        <div style={{ marginTop: '2px' }}>
+                          {getIcon(file.fileType)}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <strong style={{ fontSize: '15px', color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                              {file.title}
+                            </strong>
+                            {file.relevanceScore > 0 && (
+                              <span style={{ fontSize: '10px', fontWeight: '800', padding: '2px 8px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <Sparkle size={10} weight="fill" />
+                                Score: {file.relevanceScore}
+                              </span>
+                            )}
+                          </div>
+
+                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                            <span>Uploaded by: <strong>{file.uploaderName}</strong></span>
+                            <span>•</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: '700' }}>🎓 Programme: {file.uploaderProgrammeName}</span>
+                            <span>•</span>
+                            <span>Year: {file.uploaderYear}</span>
+                          </div>
+
+                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', gap: '10px', marginTop: '2px' }}>
+                            <span>{file.fileType.toUpperCase()} • {file.size}</span>
+                            <span>•</span>
+                            <span>📥 {file.downloads || 0} downloads</span>
+                            {file.uploadDate && <span>• Uploaded: {file.uploadDate}</span>}
+                          </div>
+
+                          {/* Match Reasons Badges */}
+                          {file.matchReasons && file.matchReasons.length > 0 && (
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+                              {file.matchReasons.map((reason, idx) => (
+                                <span key={idx} style={{ fontSize: '9.5px', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: 'var(--bg-surface)', color: 'var(--text-secondary)', border: '1px solid var(--border-color)' }}>
+                                  {reason}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
                         {!isOwnFile && (
                           <button 
                             className="cohort-btn cohort-btn-primary" 
                             onClick={() => handleCopyResource(file)}
-                            style={{ padding: '6px 12px', fontSize: '11.5px', gap: '4px' }}
+                            style={{ padding: '8px 14px', fontSize: '12px', gap: '6px' }}
                           >
-                            <Plus size={12} weight="bold" />
-                            Add to My Resources
+                            <Plus size={14} weight="bold" />
+                            <span>Add to My Resources</span>
                           </button>
                         )}
                         <button 
                           className="cohort-btn" 
                           onClick={() => handleDownload(file)}
-                          style={{ padding: '6px' }}
+                          style={{ padding: '8px 12px' }}
+                          title="Download Resource"
                         >
                           <Download size={14} weight="bold" />
                         </button>
@@ -453,11 +587,11 @@ export function Repository({
                 })
               ) : searched ? (
                 <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '40px 0' }}>
-                  No public resources found matching your search.
+                  No public academic resources found matching your active filters. Try clearing filters or searching for keywords!
                 </div>
               ) : (
                 <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '40px 0' }}>
-                  Enter a keyword above to scan the globally shared study repository.
+                  Type something in the search bar above to discover resources.
                 </div>
               )}
             </div>
@@ -467,4 +601,5 @@ export function Repository({
     </motion.div>
   );
 }
+
 export default Repository;

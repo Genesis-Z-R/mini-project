@@ -2,14 +2,31 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Academic Companion is a Neumorphic dashboard designed to coordinate schedules, study goals, class conflicts, study groups, and notes in one tactile workspace." />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="96x96" href="/logo96.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#5E81F4" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Estudy" />
+    <meta name="description" content="Estudy Academic Companion - Coordinate schedules, study goals, peer recommendations, and resources in one tactile workspace." />
     <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@800&f[]=satoshi@300,400,500,700&f[]=sentient@400,700&display=swap" rel="stylesheet" />
-    <title>Academic. — Neumorphic Student Academic Companion</title>
+    <title>Estudy — Academic Student Companion</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then((reg) => console.log('Estudy PWA Service Worker registered:', reg.scope))
+            .catch((err) => console.warn('PWA Service Worker registration failed:', err));
+        });
+      }
+    </script>
   </body>
 </html>

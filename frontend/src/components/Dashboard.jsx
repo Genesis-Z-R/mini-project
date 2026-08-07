@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { BookOpen, Calendar, Clock, Checks, Bell, Play, Square, Circle } from '@phosphor-icons/react';
+import { BookOpen, Calendar, Clock, Checks, Bell, Play, Square, Circle, Tag, CaretRight } from '@phosphor-icons/react';
 
 export function Dashboard({
-  schedule,
-  files,
-  courses,
-  studySessions,
+  schedule = [],
+  files = [],
+  courses = [],
+  studySessions = [],
   onSaveStudySession,
   onNavigate,
   profile
@@ -30,9 +30,8 @@ export function Dashboard({
     };
   }, []);
 
-  const learningRingBaseColor = isDarkMode ? '#e2e8f0' : 'var(--bg-navigation)';
-  const learningRingProgressColor = isDarkMode ? '#2563eb' : 'var(--blue-ring, #3b82f6)';
-  const learningRingTextColor = isDarkMode ? '#1d4ed8' : 'var(--blue-ring, #3b82f6)';
+  const learningRingBaseColor = 'var(--bg-navigation)';
+  const learningRingProgressColor = 'var(--accent-secondary)';
 
   const today = new Date();
   const todayString = today.toISOString().split('T')[0];
@@ -42,7 +41,7 @@ export function Dashboard({
   const currentYear = today.getFullYear();
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
 
-  // 1. Initialize and recover timer from localStorage
+  // Initialize and recover timer from localStorage
   useEffect(() => {
     const savedStart = localStorage.getItem('study-timer-start');
     if (savedStart) {
@@ -70,8 +69,6 @@ export function Dashboard({
     setTimerActive(true);
 
     timerIntervalRef.current = setInterval(() => {
-      setElapsedSeconds(Math.floor((Date.now() - Date.now()) / 1000)); // Reset tick
-      // Recalculate accurately based on start timestamp
       setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
   };
@@ -90,7 +87,7 @@ export function Dashboard({
     if (savedStart) {
       const startTimeVal = parseInt(savedStart, 10);
       const seconds = Math.floor((Date.now() - startTimeVal) / 1000);
-      const durationMin = Math.round(seconds / 60) || 1; // Minimum 1 minute
+      const durationMin = Math.round(seconds / 60) || 1;
 
       const formatTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -116,24 +113,31 @@ export function Dashboard({
     ].filter(Boolean).join(':');
   };
 
-  // 2. Calculate daily total learning time from Firestore study sessions
+  const formatDuration = (minutes) => {
+    const totalMin = Math.round(minutes) || 1;
+    const h = Math.floor(totalMin / 60);
+    const m = totalMin % 60;
+    if (h > 0 && m > 0) return `${h}hr${h > 1 ? 's' : ''} ${m}min${m > 1 ? 's' : ''}`;
+    if (h > 0) return `${h}hr${h > 1 ? 's' : ''}`;
+    return `${m}min${m > 1 ? 's' : ''}`;
+  };
+
   const todaysSessions = studySessions.filter(s => s.date === todayString);
   const totalTodayMinutes = todaysSessions.reduce((acc, curr) => acc + (curr.durationMinutes || 0), 0);
 
-  // SVG Donut calculation (target 120 minutes = 100% stroke)
   const targetMinutes = 120;
   const liveTotalMinutes = totalTodayMinutes + (timerActive ? elapsedSeconds / 60 : 0);
   const percentage = Math.min((liveTotalMinutes / targetMinutes) * 100, 100);
   const strokeDasharray = `${percentage} ${100 - percentage}`;
 
-  // 3. Greeting formatting
   const firstName = profile?.name ? profile.name.split(' ')[0] : 'Student';
 
-  // 4. Map schedule items
-  // TODAY'S CLASSES: repeating weekly on current weekday, OR one-time event set to today's date
+  // TODAY'S CLASSES
   const todaysClasses = schedule
     .filter(item => {
-      if (!item.isClass) return false;
+      const isClassType = item.scheduleType ? item.scheduleType === 'CLASS' : item.isClass;
+      if (!isClassType) return false;
+
       if (item.isRepeating) {
         return item.day === currentDayName;
       } else {
@@ -142,85 +146,43 @@ export function Dashboard({
     })
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-  // UPCOMING TASKS: non-class schedule items (meetings, tasks) happening in the next 7 days
-  const getUpcomingTasks = () => {
-    const today = new Date();
-    const list = [];
+  // TODAY'S SCHEDULE / EVENTS
+  const todaysScheduleEvents = schedule
+    .filter(item => {
+      const isClassType = item.scheduleType ? item.scheduleType === 'CLASS' : item.isClass;
+      if (isClassType) return false;
 
-    // Check weekday indexes for next 7 days
-    for (let i = 0; i < 7; i++) {
-      const targetDate = new Date(today);
-      targetDate.setDate(today.getDate() + i);
-      const targetDayName = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
-      const targetDateStr = targetDate.toISOString().split('T')[0];
-
-      schedule.forEach(item => {
-        if (item.isClass) return; // Only non-class events
-
-        let matches = false;
-        if (item.isRepeating) {
-          matches = item.day === targetDayName;
-        } else {
-          matches = item.day === targetDateStr;
-        }
-
-        if (matches) {
-          list.push({
-            ...item,
-            formattedDate: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : targetDayName,
-            sortKey: i
-          });
-        }
-      });
-    }
-
-    return list.sort((a, b) => {
-      if (a.sortKey !== b.sortKey) return a.sortKey - b.sortKey;
-      return a.startTime.localeCompare(b.startTime);
-    });
-  };
-
-  const upcomingTasks = getUpcomingTasks();
-
-  // 5. Dynamic Reminders: warning blocks for events starting within the next 2 hours today
-  const getActiveReminders = () => {
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMin = now.getMinutes();
-    const currentTotalMin = currentHour * 60 + currentMin;
-
-    const list = [];
-    schedule.forEach(item => {
-      let isToday = false;
       if (item.isRepeating) {
-        isToday = item.day === currentDayName;
+        return item.day === currentDayName;
       } else {
-        isToday = item.day === todayString;
+        return item.day === todayString;
       }
+    })
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-      if (isToday) {
-        const [startH, startM] = item.startTime.split(':').map(Number);
-        const startTotalMin = startH * 60 + startM;
-        const diff = startTotalMin - currentTotalMin;
-
-        // Starts in next 120 minutes and hasn't started yet
-        if (diff > 0 && diff <= 120) {
-          list.push({
-            id: item.id,
-            name: item.name,
-            startTime: item.startTime,
-            room: item.room,
-            timeLeft: diff,
-            isClass: item.isClass
-          });
-        }
-      }
-    });
-
-    return list.sort((a, b) => a.timeLeft - b.timeLeft);
+  const formatCategoryLabel = (item) => {
+    if (item.scheduleType === 'CUSTOM' && item.customCategory) {
+      return item.customCategory;
+    }
+    const map = {
+      STUDY_SESSION: 'Study Session',
+      ASSIGNMENT: 'Assignment',
+      REMINDER: 'Reminder',
+      PERSONAL_EVENT: 'Personal',
+      CLASS: 'Class'
+    };
+    return map[item.scheduleType] || item.scheduleType || 'Event';
   };
 
-  const reminders = getActiveReminders();
+  const getCategoryColor = (type) => {
+    switch (type) {
+      case 'STUDY_SESSION': return { bg: 'rgba(59, 130, 246, 0.18)', text: '#60a5fa' };
+      case 'ASSIGNMENT': return { bg: 'rgba(245, 158, 11, 0.18)', text: '#fbbf24' };
+      case 'REMINDER': return { bg: 'rgba(239, 68, 68, 0.18)', text: '#f87171' };
+      case 'PERSONAL_EVENT': return { bg: 'rgba(168, 85, 247, 0.18)', text: '#c084fc' };
+      default: return { bg: 'rgba(16, 185, 129, 0.18)', text: '#34d399' };
+    }
+  };
 
   return (
     <motion.div
@@ -229,9 +191,7 @@ export function Dashboard({
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
       <div className="dashboard-grid">
-        {/* ==========================================
-           LEFT COLUMN: Main workspace
-           ========================================== */}
+        {/* LEFT COLUMN: Main workspace */}
         <div>
           {/* Welcome Banner */}
           <div className="welcome-banner-card">
@@ -241,49 +201,44 @@ export function Dashboard({
               </h2>
               <p style={{ fontSize: '13.5px', opacity: 0.9, lineHeight: '1.6' }}>
                 {todaysClasses.length > 0
-                  ? `You have ${todaysClasses.length} class sessions scheduled for today. Start your learning now.`
-                  : "You have no class sessions scheduled for today. Use the timer below to log your self-study time."}
+                  ? `You have ${todaysClasses.length} class session(s) and ${todaysScheduleEvents.length} scheduled event(s) for today.`
+                  : todaysScheduleEvents.length > 0 
+                    ? `No classes today, but you have ${todaysScheduleEvents.length} scheduled event(s) for today.`
+                    : "You have no scheduled classes or events for today. Use the timer below to log your self-study time."}
               </p>
             </div>
-            {/* Student illustration SVG */}
             <svg className="welcome-banner-img" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* Blue circle background */}
               <circle cx="70" cy="70" r="70" fill="rgba(255,255,255,0.18)" />
-              {/* Head */}
               <circle cx="70" cy="62" r="20" fill="white" />
-              {/* Body / shoulders */}
               <path d="M30 120 C30 88 110 88 110 120 Z" fill="white" />
-              {/* Graduation cap board */}
               <rect x="44" y="42" width="52" height="8" rx="2" fill="white" />
-              {/* Cap top */}
               <polygon points="70,28 100,42 70,48 40,42" fill="white" />
-              {/* Cap tassel */}
               <line x1="100" y1="42" x2="104" y2="56" stroke="white" strokeWidth="2.5" strokeLinecap="round" />
               <circle cx="104" cy="59" r="3" fill="white" />
             </svg>
           </div>
 
-          {/* Two-Column Middle widgets: Learning Time & Daily Schedule */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '28px' }}>
-
-            {/* Learning Time Interactive Donut & Stopwatch */}
+          {/* Two-Column Middle widgets: Learning Timer & Today's Classes */}
+          <div className="dashboard-middle-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '28px' }}>
+            {/* Learning Timer & Interactive Session History */}
             <div
-              className="cohort-card nm-out dashboard-widget-learning-timer"
+              className="cohort-card nm-out"
               style={{
                 padding: '24px',
                 display: 'flex',
                 flexDirection: 'column',
                 justify: 'space-between',
-                background: isDarkMode ? '#ffffff' : '#dbeafe',
-                border: isDarkMode ? '1px solid rgba(15, 23, 42, 0.08)' : 'none',
-                boxShadow: isDarkMode ? '0 8px 30px rgba(0, 0, 0, 0.35)' : '0 4px 20px rgba(59, 130, 246, 0.18)'
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-out)'
               }}
             >
               <div>
-                <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: '#1e40af' }}>Learning Timer</h3>
+                <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>
+                  Learning Timer
+                </h3>
 
                 <div style={{ display: 'flex', alignItems: 'center', justify: 'space-between', gap: '16px' }}>
-                  {/* Donut chart */}
                   <div className="donut-chart-container" style={{ margin: 0 }}>
                     <svg width="100" height="100" viewBox="0 0 42 42">
                       <circle cx="21" cy="21" r="15.915" fill="transparent" stroke={learningRingBaseColor} strokeWidth="4"></circle>
@@ -303,16 +258,15 @@ export function Dashboard({
                       ></circle>
                     </svg>
                     <div className="donut-chart-center">
-                      <strong style={{ fontSize: '13px', color: learningRingTextColor }}>
+                      <strong style={{ fontSize: '13px', color: 'var(--text-primary)' }}>
                         {Math.floor(liveTotalMinutes / 60)}h {Math.floor(liveTotalMinutes % 60)}m
                       </strong>
-                      <span style={{ fontSize: '8px', color: isDarkMode ? '#475569' : 'var(--text-tertiary)' }}>Today</span>
+                      <span style={{ fontSize: '8px', color: 'var(--text-tertiary)' }}>Today</span>
                     </div>
                   </div>
 
-                  {/* Stopwatch controls */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                    <div style={{ fontSize: '22px', fontWeight: '800', fontFamily: 'monospace', color: learningRingTextColor, textAlign: 'center' }}>
+                    <div style={{ fontSize: '22px', fontWeight: '800', fontFamily: 'monospace', color: 'var(--text-primary)', textAlign: 'center' }}>
                       {formatTimerString(elapsedSeconds)}
                     </div>
                     {timerActive ? (
@@ -320,7 +274,7 @@ export function Dashboard({
                         <button
                           onClick={() => setShowStopConfirm(true)}
                           className="cohort-btn"
-                          style={{ background: 'rgba(239,68,68,0.1)', color: '#EF4444', border: '1px solid rgba(239,68,68,0.2)', width: '100%', justify: 'center', gap: '6px' }}
+                          style={{ background: 'rgba(239,68,68,0.15)', color: '#F87171', border: '1px solid rgba(239,68,68,0.3)', width: '100%', justify: 'center', gap: '6px' }}
                         >
                           <Square size={12} weight="fill" />
                           <span>Stop Session</span>
@@ -330,7 +284,7 @@ export function Dashboard({
                             onClick={() => setShowStopConfirm(false)}
                             style={{
                               position: 'fixed', inset: 0,
-                              background: 'rgba(0,0,0,0.35)',
+                              background: 'rgba(0,0,0,0.65)',
                               backdropFilter: 'blur(6px)',
                               WebkitBackdropFilter: 'blur(6px)',
                               zIndex: 9999,
@@ -340,16 +294,16 @@ export function Dashboard({
                             <div
                               onClick={e => e.stopPropagation()}
                               style={{
-                                background: '#ffffff',
-                                border: '1px solid #e2e8f0',
+                                background: 'var(--bg-surface)',
+                                border: '1px solid var(--border-color)',
                                 borderRadius: '14px',
                                 padding: '28px 32px',
-                                boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
+                                boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
                                 textAlign: 'center',
                                 minWidth: '240px',
                               }}
                             >
-                              <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '16px', color: '#0f172a' }}>End session?</div>
+                              <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '16px', color: 'var(--text-primary)' }}>End session?</div>
                               <div style={{ display: 'flex', gap: '10px' }}>
                                 <button onClick={handleStopTimer} className="cohort-btn confirm-btn-yes" style={{ flex: 1, justifyContent: 'center', padding: '8px', background: '#15803d', color: '#ffffff', fontWeight: '700', border: 'none', borderRadius: '8px' }}>Yes</button>
                                 <button onClick={() => setShowStopConfirm(false)} className="cohort-btn confirm-btn-no" style={{ flex: 1, justifyContent: 'center', padding: '8px', background: '#b91c1c', color: '#ffffff', fontWeight: '700', border: 'none', borderRadius: '8px' }}>No</button>
@@ -372,41 +326,91 @@ export function Dashboard({
                 </div>
               </div>
 
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '12px' }}>
-                {todaysSessions.length > 0
-                  ? `Completed ${todaysSessions.length} study session(s) today.`
-                  : "No study periods logged yet. Start learning today!"}
+              {/* Logged Sessions Feed */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '12px' }}>
+                <div style={{ fontSize: '12px', fontWeight: '800', marginBottom: '8px', color: 'var(--text-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Completed Sessions Today ({todaysSessions.length})</span>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '110px', overflowY: 'auto' }}>
+                  {todaysSessions.length > 0 ? (
+                    todaysSessions.map((session, idx) => (
+                      <div key={session.id || idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'var(--bg-navigation)', borderRadius: '6px' }}>
+                        <span style={{ fontSize: '11.5px', fontWeight: '700', color: 'var(--text-primary)' }}>
+                          session {idx + 1}
+                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {session.startTime && (
+                            <span style={{ fontSize: '10.5px', color: 'var(--text-secondary)' }}>
+                              {session.startTime} - {session.endTime}
+                            </span>
+                          )}
+                          <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#60a5fa', background: 'rgba(59, 130, 246, 0.18)', padding: '2px 8px', borderRadius: '4px' }}>
+                            {formatDuration(session.durationMinutes || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={{ color: 'var(--text-tertiary)', fontSize: '11px', textAlign: 'center', padding: '10px 0' }}>
+                      No study sessions logged today. Start timer to record session 1!
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Daily Schedule Ticker */}
+            {/* Today's Classes Section */}
             <div
-              className="cohort-card nm-out dashboard-widget-todays-classes"
+              className="cohort-card nm-out"
               style={{
                 padding: '24px',
-                background: isDarkMode ? '#ffffff' : '#dbeafe',
-                border: isDarkMode ? '1px solid rgba(15, 23, 42, 0.08)' : 'none',
-                boxShadow: isDarkMode ? '0 8px 30px rgba(0, 0, 0, 0.35)' : '0 4px 20px rgba(59, 130, 246, 0.18)'
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-color)',
+                boxShadow: 'var(--shadow-out)'
               }}
             >
-              <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'baseline', gap: '8px', color: '#1e40af' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'baseline', gap: '8px', color: 'var(--text-primary)' }}>
                 <span>Today's Classes</span>
-                <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#1e40af' }}>{currentDayName}</span>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-tertiary)' }}>• {currentDayName}</span>
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '160px', overflowY: 'auto' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '200px', overflowY: 'auto' }}>
                 {todaysClasses.length > 0 ? (
                   todaysClasses.map(item => (
-                    <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: 'rgba(59,130,246,0.08)', borderRadius: '8px' }}>
-                      <Clock size={16} style={{ color: '#3b82f6' }} />
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '12.5px', fontWeight: '700' }}>{item.name}</span>
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{item.startTime} - {item.endTime} | {item.room}</span>
+                    <div 
+                      key={item.id} 
+                      onClick={() => {
+                        if (onNavigate) {
+                          onNavigate('courses', item.courseId);
+                        }
+                      }}
+                      style={{ 
+                        cursor: 'pointer',
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        padding: '10px 14px', 
+                        background: 'var(--bg-navigation)', 
+                        borderRadius: '8px',
+                        transition: 'all 0.2s ease'
+                      }}
+                      className="class-row-card"
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <Clock size={16} style={{ color: 'var(--accent-secondary)', flexShrink: 0 }} />
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-primary)' }}>{item.name}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                            {item.startTime} - {item.endTime} | {item.room || 'Lecture Room'}
+                          </span>
+                        </div>
                       </div>
+                      <CaretRight size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
                     </div>
                   ))
                 ) : (
                   <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '40px 0' }}>
-                    No lectures scheduled today.
+                    No lectures scheduled for today.
                   </div>
                 )}
               </div>
@@ -414,24 +418,22 @@ export function Dashboard({
           </div>
         </div>
 
-        {/* ==========================================
-           RIGHT COLUMN: Widget sidebar
-           ========================================== */}
+        {/* RIGHT COLUMN: Sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
 
           {/* Calendar Picker Widget */}
           <div className="cohort-card nm-out" style={{
             padding: '20px',
-            background: '#f0fdf4',
-            boxShadow: '0 4px 20px rgba(34, 197, 94, 0.10)',
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-color)',
+            boxShadow: 'var(--shadow-out)',
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-              <span style={{ fontSize: '13.5px', fontWeight: '800', color: '#166534' }}>{currentMonth} {currentYear}</span>
+              <span style={{ fontSize: '13.5px', fontWeight: '800', color: 'var(--text-primary)' }}>{currentMonth} {currentYear}</span>
             </div>
-            {/* Simple calendar numbers grid */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px', textAlign: 'center', fontSize: '15px', fontWeight: '600' }}>
               {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-                <div key={i} style={{ color: '#4ade80', fontWeight: '700', fontSize: '10px', marginBottom: '2px' }}>{d}</div>
+                <div key={i} style={{ color: 'var(--text-tertiary)', fontWeight: '700', fontSize: '10px', marginBottom: '2px' }}>{d}</div>
               ))}
               {Array.from({ length: new Date(today.getFullYear(), today.getMonth(), 1).getDay() }, (_, i) => (
                 <div key={`empty-${i}`} style={{ padding: '6px', fontSize: '11px' }} />
@@ -444,8 +446,8 @@ export function Dashboard({
                     padding: '6px',
                     fontSize: '11px',
                     border: 'none',
-                    background: day === currentDay ? '#86efac' : 'transparent',
-                    color: day === currentDay ? '#14532d' : '#374151',
+                    background: day === currentDay ? 'var(--accent)' : 'transparent',
+                    color: day === currentDay ? '#ffffff' : 'var(--text-primary)',
                     borderRadius: '50%',
                     fontWeight: day === currentDay ? '800' : 'normal',
                     display: 'flex',
@@ -462,60 +464,34 @@ export function Dashboard({
             </div>
           </div>
 
-          {/* Upcoming Tasks (Non-class events like meetings, tasks) */}
-          <div className="cohort-card nm-out" style={{ padding: '24px', background: '#f0fdf4', boxShadow: '0 4px 20px rgba(34, 197, 94, 0.10)' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: '#166534' }}>Upcoming Tasks</h3>
+          {/* Today's Schedule (All Non-Class Events Happening Today) */}
+          <div className="cohort-card nm-out" style={{ padding: '24px', background: 'var(--bg-surface)', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-out)' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>Today's Schedule</h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '200px', overflowY: 'auto' }}>
-              {upcomingTasks.length > 0 ? (
-                upcomingTasks.map(task => (
-                  <div key={task.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', background: 'rgba(34,197,94,0.08)', borderRadius: '8px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Circle size={8} weight="fill" style={{ color: '#22c55e' }} />
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontSize: '12.5px', fontWeight: '700' }}>{task.name}</span>
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                          {task.formattedDate} • {task.startTime} - {task.endTime}
-                        </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '240px', overflowY: 'auto' }}>
+              {todaysScheduleEvents.length > 0 ? (
+                todaysScheduleEvents.map(event => {
+                  const styleColors = getCategoryColor(event.scheduleType);
+                  return (
+                    <div key={event.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: 'var(--bg-navigation)', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Circle size={8} weight="fill" style={{ color: styleColors.text }} />
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-primary)' }}>{event.name}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                            {event.startTime} - {event.endTime} {event.room ? `| ${event.room}` : ''}
+                          </span>
+                        </div>
                       </div>
+                      <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '6px', background: styleColors.bg, color: styleColors.text }}>
+                        {formatCategoryLabel(event)}
+                      </span>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div style={{ color: 'var(--text-tertiary)', fontSize: '11.5px', textAlign: 'center', padding: '20px 0' }}>
-                  No pending meetings or events.
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Dynamic Reminders */}
-          <div className="cohort-card nm-out" style={{ padding: '20px', background: '#f0fdf4', boxShadow: '0 4px 20px rgba(34, 197, 94, 0.10)' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px', color: '#166534' }}>
-              <Bell size={16} style={{ color: '#22c55e' }} />
-              Reminders
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '12.5px' }}>
-              {reminders.length > 0 ? (
-                reminders.map(rem => (
-                  <div
-                    key={rem.id}
-                    style={{
-                      padding: '8px 12px',
-                      background: rem.isClass ? 'rgba(63, 195, 128, 0.06)' : 'rgba(94, 129, 244, 0.06)',
-                      borderLeft: `3px solid ${rem.isClass ? '#3FC380' : '#5E81F4'}`,
-                      borderRadius: '6px'
-                    }}
-                  >
-                    <strong>{rem.name} Starting Soon</strong>
-                    <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                      Starts at {rem.startTime} (in {rem.timeLeft} minutes) | {rem.room}
-                    </p>
-                  </div>
-                ))
-              ) : (
-                <div style={{ color: 'var(--text-tertiary)', fontSize: '11.5px', textAlign: 'center', padding: '10px 0' }}>
-                  All caught up for today!
+                  No non-class schedule items for today.
                 </div>
               )}
             </div>
@@ -526,4 +502,5 @@ export function Dashboard({
     </motion.div>
   );
 }
+
 export default Dashboard;

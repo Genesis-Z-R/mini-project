@@ -1,5 +1,5 @@
 // REST API Client Adapter for Spring Boot Backend
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080/api";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 // Helper function to build headers with Authorization token if present
 const getAuthHeaders = () => {
@@ -103,15 +103,7 @@ export const auth = {
       this.notifyListeners(userObj);
       return { user: userObj };
     } catch (err) {
-      // Fallback mock authentication if backend server is not yet online during dev
-      const userObj = {
-        email: email.trim().toLowerCase(),
-        emailVerified: true,
-        uid: email.trim().toLowerCase()
-      };
-      localStorage.setItem("estudy_token", "mock_jwt_token_" + Date.now());
-      this.notifyListeners(userObj);
-      return { user: userObj };
+      throw err;
     }
   },
 
@@ -135,15 +127,7 @@ export const auth = {
       this.notifyListeners(userObj);
       return { user: userObj };
     } catch (err) {
-      // Fallback mock registration if backend server is not yet online
-      const userObj = {
-        email: email.trim().toLowerCase(),
-        emailVerified: true,
-        uid: email.trim().toLowerCase()
-      };
-      localStorage.setItem("estudy_token", "mock_jwt_token_" + Date.now());
-      this.notifyListeners(userObj);
-      return { user: userObj };
+      throw err;
     }
   },
 
@@ -180,10 +164,6 @@ export const signOut = async (authInstance) => {
 
 export const onAuthStateChanged = (authInstance, callback) => {
   return auth.onAuthStateChanged(callback);
-};
-
-export const sendEmailVerification = async (user) => {
-  console.log("Email verification handled via backend service.");
 };
 
 // Database Service Layer communicating with Spring Boot REST API
@@ -245,6 +225,19 @@ export const DatabaseService = {
     }
   },
 
+  async saveProfile(emailOrData, optionalData) {
+    let email, data;
+    if (typeof emailOrData === 'string') {
+      email = emailOrData;
+      data = optionalData;
+    } else {
+      data = emailOrData;
+      email = data?.email;
+    }
+    if (!email) return data;
+    return this.updateProfile(email, data);
+  },
+
   async getAllProfiles() {
     try {
       const data = await apiFetch("/profiles");
@@ -272,7 +265,19 @@ export const DatabaseService = {
         body: JSON.stringify(newCourse)
       });
     } catch (err) {
-      return newCourse;
+      throw err;
+    }
+  },
+
+  async updateCourse(id, userId, course) {
+    const updatedCourse = { ...course, id, userId };
+    try {
+      return await apiFetch(`/courses/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify(updatedCourse)
+      });
+    } catch (err) {
+      throw err;
     }
   },
 
@@ -294,7 +299,7 @@ export const DatabaseService = {
   },
 
   async addScheduleItem(userId, item) {
-    const id = "s_" + Date.now();
+    const id = item.id || ("s_" + Date.now());
     const newItem = { ...item, id, userId };
     try {
       const res = await apiFetch("/schedule", {
@@ -303,19 +308,19 @@ export const DatabaseService = {
       });
       return { success: true, item: res || newItem };
     } catch (err) {
-      return { success: true, item: newItem };
+      return { success: false, error: err.message || "Failed to add schedule item." };
     }
   },
 
   async updateScheduleItem(id, userId, item) {
     try {
-      await apiFetch(`/schedule/${encodeURIComponent(id)}`, {
+      const res = await apiFetch(`/schedule/${encodeURIComponent(id)}`, {
         method: "PUT",
         body: JSON.stringify({ ...item, userId })
       });
-      return { success: true };
+      return { success: true, item: res };
     } catch (err) {
-      return { success: true };
+      return { success: false, error: err.message || "Failed to update schedule item." };
     }
   },
 
@@ -337,14 +342,32 @@ export const DatabaseService = {
   },
 
   async uploadFileToStorage(fileObj) {
-    // Placeholder architecture endpoint for Spring Boot File Storage
-    const sizeStr = (fileObj.size < 1024 * 1024)
-      ? (fileObj.size / 1024).toFixed(1) + " KB"
-      : (fileObj.size / (1024 * 1024)).toFixed(1) + " MB";
+    const formData = new FormData();
+    formData.append("file", fileObj);
+
+    const token = localStorage.getItem("estudy_token");
+    const headers = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`${API_BASE_URL}/files/upload`, {
+      method: "POST",
+      headers,
+      body: formData
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(errorData.message || "Binary file upload failed.");
+    }
+
+    const data = await res.json();
     return {
-      publicUrl: `http://localhost:8080/uploads/${encodeURIComponent(fileObj.name)}`,
-      size: fileObj.size,
-      sizeStr
+      publicUrl: data.publicUrl,
+      size: data.size || fileObj.size,
+      sizeStr: data.sizeStr,
+      filename: data.filename
     };
   },
 
@@ -380,9 +403,17 @@ export const DatabaseService = {
     }
   },
 
-  async searchGlobalPublicFiles(searchTerm) {
+  async searchGlobalPublicFiles(searchTerm = '', userId = '', filters = {}) {
     try {
-      const data = await apiFetch(`/files/search?query=${encodeURIComponent(searchTerm)}`);
+      const params = new URLSearchParams();
+      if (searchTerm) params.append("query", searchTerm);
+      if (userId) params.append("userId", userId);
+      if (filters.programmeOnly) params.append("programmeOnly", "true");
+      if (filters.sameCourseOnly) params.append("sameCourseOnly", "true");
+      if (filters.fileType) params.append("fileType", filters.fileType);
+      if (filters.recentOnly) params.append("recentOnly", "true");
+
+      const data = await apiFetch(`/files/search?${params.toString()}`);
       return data || [];
     } catch (err) {
       return [];
@@ -416,7 +447,20 @@ export const DatabaseService = {
   async getQuizzes(userId) {
     try {
       const data = await apiFetch(`/quizzes?userId=${encodeURIComponent(userId)}`);
-      return data || [];
+      return (data || []).map(quiz => {
+        let questions = quiz.questions;
+        if (!questions && quiz.questionsJson) {
+          try {
+            questions = typeof quiz.questionsJson === 'string' ? JSON.parse(quiz.questionsJson) : quiz.questionsJson;
+          } catch (_) {
+            questions = [];
+          }
+        }
+        return {
+          ...quiz,
+          questions: questions || []
+        };
+      });
     } catch (err) {
       return [];
     }
@@ -424,14 +468,22 @@ export const DatabaseService = {
 
   async addQuiz(quiz) {
     const id = "q_" + Date.now();
-    const newQuiz = { ...quiz, id };
+    const questionsJson = typeof quiz.questions === 'object' ? JSON.stringify(quiz.questions) : (quiz.questionsJson || '[]');
+    const newQuiz = { ...quiz, id, questionsJson };
     try {
-      return await apiFetch("/quizzes", {
+      const res = await apiFetch("/quizzes", {
         method: "POST",
         body: JSON.stringify(newQuiz)
       });
+      return {
+        ...(res || newQuiz),
+        questions: quiz.questions || []
+      };
     } catch (err) {
-      return newQuiz;
+      return {
+        ...newQuiz,
+        questions: quiz.questions || []
+      };
     }
   },
 
@@ -488,28 +540,34 @@ export const DatabaseService = {
   async sendFriendRequest(senderId, receiverId) {
     const id = "fr_" + Date.now();
     try {
-      await apiFetch("/friendships", {
+      return await apiFetch("/friendships", {
         method: "POST",
         body: JSON.stringify({ id, senderId, receiverId, status: "pending" })
       });
     } catch (err) {
       console.warn("Send friend request warning:", err.message);
+      return { id, senderId, receiverId, status: "pending" };
     }
   },
 
-  async acceptFriendRequest(id) {
+  async acceptFriendRequest(id, userId = "") {
     try {
-      await apiFetch(`/friendships/${encodeURIComponent(id)}/accept`, { method: "PUT" });
+      const queryParam = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+      return await apiFetch(`/friendships/${encodeURIComponent(id)}/accept${queryParam}`, { method: "PUT" });
     } catch (err) {
       console.warn("Accept friend request warning:", err.message);
+      return { id, status: "accepted" };
     }
   },
 
-  async removeFriendship(id) {
+  async removeFriendship(id, userId = "") {
     try {
-      await apiFetch(`/friendships/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const queryParam = userId ? `?userId=${encodeURIComponent(userId)}` : "";
+      await apiFetch(`/friendships/${encodeURIComponent(id)}${queryParam}`, { method: "DELETE" });
+      return true;
     } catch (err) {
       console.warn("Remove friendship warning:", err.message);
+      return false;
     }
   },
 
@@ -546,6 +604,85 @@ export const DatabaseService = {
     } catch (err) {
       return newAttempt;
     }
+  },
+
+  async getProgrammes() {
+    try {
+      const data = await apiFetch("/programmes");
+      return data || [];
+    } catch (err) {
+      return [];
+    }
+  },
+
+  async createProgramme(name) {
+    return await apiFetch("/programmes", {
+      method: "POST",
+      body: JSON.stringify({ name })
+    });
+  },
+
+  async getRecommendedPeers(userId) {
+    try {
+      const data = await apiFetch(`/peers/recommended?userId=${encodeURIComponent(userId)}`);
+      return data || [];
+    } catch (err) {
+      return [];
+    }
+  },
+
+  async getNotifications(userId) {
+    try {
+      const data = await apiFetch(`/notifications?userId=${encodeURIComponent(userId)}`);
+      return data || [];
+    } catch (err) {
+      return [];
+    }
+  },
+
+  async markNotificationAsRead(id) {
+    try {
+      return await apiFetch(`/notifications/${encodeURIComponent(id)}/read`, {
+        method: "PATCH"
+      });
+    } catch (err) {
+      console.warn("markNotificationAsRead warning:", err);
+    }
+  },
+
+  async markAllNotificationsAsRead(userId) {
+    try {
+      return await apiFetch(`/notifications/read-all?userId=${encodeURIComponent(userId)}`, {
+        method: "PATCH"
+      });
+    } catch (err) {
+      console.warn("markAllNotificationsAsRead warning:", err);
+    }
+  },
+
+  async deleteNotification(id) {
+    try {
+      await apiFetch(`/notifications/${encodeURIComponent(id)}`, {
+        method: "DELETE"
+      });
+    } catch (err) {
+      console.warn("deleteNotification warning:", err);
+    }
+  },
+
+  async getSettings(userId) {
+    try {
+      return await apiFetch(`/settings?userId=${encodeURIComponent(userId)}`);
+    } catch (err) {
+      return {};
+    }
+  },
+
+  async updateSettings(userId, settingsData) {
+    return await apiFetch(`/settings?userId=${encodeURIComponent(userId)}`, {
+      method: "PUT",
+      body: JSON.stringify({ userId, ...settingsData })
+    });
   }
 };
 
