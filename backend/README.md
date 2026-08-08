@@ -13,7 +13,7 @@ High-performance, production-ready Node.js + Express REST API backend for the **
 
 - **Runtime:** Node.js (ES Modules `"type": "module"`)
 - **Web Framework:** Express 4 (`express`)
-- **ORM & Database:** Prisma ORM 6 (`@prisma/client`, SQLite default / MySQL ready)
+- **ORM & Database:** Prisma ORM 6 (`@prisma/client`, MySQL)
 - **Authentication:** JWT (`jsonwebtoken`) & BCrypt (`bcryptjs`)
 - **Validation:** Zod schemas (`zod`)
 - **File Uploads:** Multer (`multer`) saving to `public/uploads`
@@ -41,7 +41,7 @@ Defaults in `.env`:
 ```env
 PORT=8080
 NODE_ENV=development
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="mysql://root:password@localhost:3306/estudy_db"
 JWT_SECRET="EstudySecretKeyForJWTSignatureGeneration32BytesLong!"
 JWT_EXPIRES_IN="24h"
 CORS_ORIGIN="http://localhost:5173,http://localhost:3000"

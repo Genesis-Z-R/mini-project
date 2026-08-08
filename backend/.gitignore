@@ -5,3 +5,5 @@ public/uploads/*
 dist/
 coverage/
 *.log
+*.db
+*.db-journal
