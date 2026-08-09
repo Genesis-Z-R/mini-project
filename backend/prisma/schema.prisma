@@ -18,20 +18,20 @@ model Profile {
   gender                             String?
   programmeId                        String?
   programmeName                      String?
-  notificationsEnabled               Boolean       @default(true)
+  notificationsEnabled               Boolean       @default(false)
   isPublic                           Boolean       @default(true)
-  dailyDigestEnabled                 Boolean       @default(true)
+  dailyDigestEnabled                 Boolean       @default(false)
   isDarkMode                         Boolean       @default(false)
   publicResourceDirectoryEnabled     Boolean       @default(true)
   publicProfileEnabled               Boolean       @default(true)
-  pushNotificationsMaster            Boolean       @default(true)
-  classRemindersEnabled              Boolean       @default(true)
-  studySessionRemindersEnabled       Boolean       @default(true)
-  eventRemindersEnabled              Boolean       @default(true)
-  friendRequestReceivedEnabled       Boolean       @default(true)
-  friendRequestAcceptedEnabled       Boolean       @default(true)
-  friendResourceUploadEnabled       Boolean       @default(true)
-  friendCourseResourceUploadEnabled Boolean       @default(true)
+  pushNotificationsMaster            Boolean       @default(false)
+  classRemindersEnabled              Boolean       @default(false)
+  studySessionRemindersEnabled       Boolean       @default(false)
+  eventRemindersEnabled              Boolean       @default(false)
+  friendRequestReceivedEnabled       Boolean       @default(false)
+  friendRequestAcceptedEnabled       Boolean       @default(false)
+  friendResourceUploadEnabled       Boolean       @default(false)
+  friendCourseResourceUploadEnabled Boolean       @default(false)
   resetToken                         String?
   resetTokenExpiry                   DateTime?
   createdAt                          DateTime      @default(now())

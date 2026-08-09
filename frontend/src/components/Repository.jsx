@@ -256,8 +256,8 @@ export function Repository({
             </div>
           )}
 
-          <div className="timetable-split-layout">
-            <div className="cohort-card nm-out" style={{ padding: '24px' }}>
+          <div className={nestedMode ? "my-resources-single-layout" : "timetable-split-layout"}>
+            <div className="cohort-card nm-out" style={{ padding: '24px', flex: 1 }}>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px', overflowX: 'auto' }}>
                 {['all', 'pdf', 'image', 'video', 'docx'].map(cat => (
                   <button
@@ -324,48 +324,48 @@ export function Repository({
                   ))
                 ) : (
                   <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '12px', padding: '40px 0' }}>
-                    No files found in this category. Use the upload panel to add files!
+                    {nestedMode ? 'No uploaded resources for this course.' : 'No files found in this category. Use the upload panel to add files!'}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* UPLOAD FORM */}
-            <div className="cohort-card nm-out" style={{ padding: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>
-                Upload Resource
-              </h3>
+            {/* UPLOAD FORM - Hidden in nestedMode (My Courses) */}
+            {!nestedMode && (
+              <div className="cohort-card nm-out" style={{ padding: '24px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '16px', color: 'var(--text-primary)' }}>
+                  Upload Resource
+                </h3>
 
-              <form onSubmit={handleUploadSubmit}>
-                <div className="form-group" style={{ marginBottom: '14px' }}>
-                  <label className="form-label">Select Local File</label>
-                  <input 
-                    type="file" 
-                    onChange={handleFileSelect}
-                    className="cohort-input"
-                    style={{ padding: '8px' }}
-                    required
-                  />
-                  {selectedFile && (
-                    <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginTop: '4px', display: 'block' }}>
-                      Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
-                    </span>
-                  )}
-                </div>
+                <form onSubmit={handleUploadSubmit}>
+                  <div className="form-group" style={{ marginBottom: '14px' }}>
+                    <label className="form-label">Select Local File</label>
+                    <input 
+                      type="file" 
+                      onChange={handleFileSelect}
+                      className="cohort-input"
+                      style={{ padding: '8px' }}
+                      required
+                    />
+                    {selectedFile && (
+                      <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: '600', marginTop: '4px', display: 'block' }}>
+                        Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                      </span>
+                    )}
+                  </div>
 
-                <div className="form-group" style={{ marginBottom: '14px' }}>
-                  <label className="form-label">Document Title</label>
-                  <input 
-                    type="text" 
-                    className="cohort-input" 
-                    placeholder="e.g. Chapter 3 Summary Notes" 
-                    value={fileTitle}
-                    onChange={e => setFileTitle(e.target.value)}
-                    required
-                  />
-                </div>
+                  <div className="form-group" style={{ marginBottom: '14px' }}>
+                    <label className="form-label">Document Title</label>
+                    <input 
+                      type="text" 
+                      className="cohort-input" 
+                      placeholder="e.g. Chapter 3 Summary Notes" 
+                      value={fileTitle}
+                      onChange={e => setFileTitle(e.target.value)}
+                      required
+                    />
+                  </div>
 
-                {!nestedMode && (
                   <div className="form-group" style={{ marginBottom: '14px' }}>
                     <label className="form-label">Associate Course</label>
                     <select 
@@ -379,51 +379,55 @@ export function Repository({
                       ))}
                     </select>
                   </div>
-                )}
 
-                <div className="form-group" style={{ marginBottom: '14px' }}>
-                  <label className="form-label">Detected Type</label>
-                  <select className="cohort-select" value={fileType} onChange={e => setFileType(e.target.value)}>
-                    <option value="pdf">PDF Document</option>
-                    <option value="docx">Word Document (.docx)</option>
-                    <option value="image">Image/Graph</option>
-                    <option value="video">Lecture Video</option>
-                  </select>
-                </div>
+                  <div className="form-group" style={{ marginBottom: '14px' }}>
+                    <label className="form-label">File Format / Category</label>
+                    <select 
+                      className="cohort-select" 
+                      value={fileType}
+                      onChange={e => setFileType(e.target.value)}
+                    >
+                      <option value="pdf">Academic Document (PDF)</option>
+                      <option value="docx">Word Document (.docx / .doc)</option>
+                      <option value="image">Diagram / Image</option>
+                      <option value="video">Lecture Video</option>
+                    </select>
+                  </div>
 
-                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '16px 0' }}>
-                  <input 
-                    type="checkbox" 
-                    id="isPublicCheck"
-                    checked={isPublic} 
-                    onChange={e => setIsPublic(e.target.checked)}
-                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                  />
-                  <label htmlFor="isPublicCheck" className="form-label" style={{ margin: 0, cursor: 'pointer', fontWeight: '700' }}>
-                    Make visible to everyone (globally searchable)
-                  </label>
-                </div>
+                  <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '16px 0' }}>
+                    <input 
+                      type="checkbox" 
+                      id="isPublicCheck"
+                      checked={isPublic} 
+                      onChange={e => setIsPublic(e.target.checked)}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="isPublicCheck" className="form-label" style={{ margin: 0, cursor: 'pointer', fontWeight: '700' }}>
+                      Make visible to everyone (globally searchable)
+                    </label>
+                  </div>
 
-                <button 
-                  type="submit" 
-                  className="cohort-btn cohort-btn-primary" 
-                  style={{ width: '100%', justifyContent: 'center', marginTop: '12px', gap: '8px' }}
-                  disabled={uploading}
-                >
-                  {uploading ? (
-                    <>
-                      <Spinner size={16} className="animate-spin" />
-                      <span>Uploading to Storage...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={16} weight="bold" />
-                      <span>Upload to Resources</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            </div>
+                  <button 
+                    type="submit" 
+                    className="cohort-btn cohort-btn-primary" 
+                    style={{ width: '100%', justifyContent: 'center', marginTop: '12px', gap: '8px' }}
+                    disabled={uploading}
+                  >
+                    {uploading ? (
+                      <>
+                        <Spinner size={16} className="animate-spin" />
+                        <span>Uploading to Storage...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={16} weight="bold" />
+                        <span>Upload to Resources</span>
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
           </div>
         </div>
       ) : (

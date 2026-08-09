@@ -187,8 +187,12 @@ function App() {
 
   const handleToggleFileVisibility = async (fileId, currentVisibility) => {
     try {
-      const updated = await DatabaseService.toggleFileVisibility(fileId, !currentVisibility, currentUser?.email?.toLowerCase());
-      setFiles(prev => prev.map(f => f.id === fileId ? updated : f));
+      const updated = await DatabaseService.toggleFileVisibility(fileId, !currentVisibility);
+      if (updated && updated.id) {
+        setFiles(prev => prev.map(f => f.id === fileId ? updated : f));
+      } else {
+        setFiles(prev => prev.map(f => f.id === fileId ? { ...f, isPublic: !currentVisibility } : f));
+      }
     } catch (err) {
       console.error("Failed to toggle file visibility:", err);
     }
@@ -518,7 +522,7 @@ function App() {
           aria-label="Search Resources"
         >
           <Globe size={20} weight={activeTab === 'global_search' ? 'fill' : 'regular'} />
-          <span>Search</span>
+          <span>Resources</span>
         </button>
       </nav>
     </div>

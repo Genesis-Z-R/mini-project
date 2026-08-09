@@ -467,12 +467,14 @@ export const DatabaseService = {
 
   async toggleFileVisibility(id, isPublic) {
     try {
-      await apiFetch(`/files/${encodeURIComponent(id)}/visibility`, {
+      const res = await apiFetch(`/files/${encodeURIComponent(id)}/visibility`, {
         method: "PATCH",
         body: JSON.stringify({ isPublic })
       });
+      return res;
     } catch (err) {
       console.warn("Toggle file visibility warning:", err.message);
+      return null;
     }
   },
 
