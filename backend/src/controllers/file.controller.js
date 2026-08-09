@@ -100,6 +100,19 @@ export const FileController = {
     }
   },
 
+  async getDownloadUrl(req, res, next) {
+    try {
+      const id = req.params.id;
+      // Identity derived strictly from authenticated JWT token (req.user)
+      const authenticatedUserId = req.user?.email ? req.user.email.toLowerCase() : null;
+      
+      const downloadData = await FileService.getDownloadUrl(id, authenticatedUserId);
+      return res.status(200).json(downloadData);
+    } catch (err) {
+      return res.status(403).json({ success: false, message: err.message });
+    }
+  },
+
   async deleteFile(req, res, next) {
     try {
       const id = req.params.id;

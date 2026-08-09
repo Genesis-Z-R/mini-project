@@ -162,31 +162,33 @@ export function Repository({
     }
   };
 
-  const handleDownload = (file) => {
-    if (file.url) {
-      const a = document.createElement('a');
-      a.href = file.url;
-      a.target = '_blank';
-      a.download = file.title;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } else {
-      const fileContent = `Estudy Resource Document\n` +
-        `Title: ${file.title}\n` +
-        `Course: ${file.courseId}\n` +
-        `Size: ${file.size}\n` +
-        `Uploaded by: ${file.uploaderName || file.userId}\n`;
+  const [fileToDelete, setFileToDelete] = useState(null);
 
-      const blob = new Blob([fileContent], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${file.title}.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+  const confirmDeleteFile = async () => {
+    if (!fileToDelete) return;
+    try {
+      await onDeleteFile(fileToDelete.id);
+      showNotification(`"${fileToDelete.title}" deleted successfully!`);
+      setFileToDelete(null);
+    } catch (err) {
+      showNotification(err.message || "Failed to delete file.", false);
+    }
+  };
+
+  const handleDownload = async (file) => {
+    try {
+      const res = await DatabaseService.getFileDownloadUrl(file.id);
+      if (res && res.downloadUrl) {
+        window.open(res.downloadUrl, '_blank');
+      } else if (file.url) {
+        window.open(file.url, '_blank');
+      }
+    } catch (err) {
+      if (file.url) {
+        window.open(file.url, '_blank');
+      } else {
+        showNotification(err.message || "Failed to generate download link.", false);
+      }
     }
   };
 
@@ -313,7 +315,7 @@ export function Repository({
                         </button>
                         <button 
                           className="cohort-btn"
-                          onClick={() => onDeleteFile(file.id)}
+                          onClick={() => setFileToDelete(file)}
                           style={{ padding: '6px', color: '#EF4444' }}
                           title="Delete File"
                         >
@@ -598,6 +600,36 @@ export function Repository({
                   Type something in the search bar above to discover resources.
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {fileToDelete && (
+        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div className="cohort-card nm-out" style={{ background: 'var(--bg-card)', padding: '28px', borderRadius: '16px', maxWidth: '420px', width: '90%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '10px', color: 'var(--text-primary)' }}>
+              Confirm Resource Deletion
+            </h3>
+            <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '24px' }}>
+              Are you sure you want to delete <strong>"{fileToDelete.title}"</strong>? This will permanently remove the resource from your workspace and storage.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+              <button 
+                className="cohort-btn" 
+                onClick={() => setFileToDelete(null)}
+                style={{ padding: '8px 16px', fontSize: '13px' }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="cohort-btn cohort-btn-primary" 
+                onClick={confirmDeleteFile}
+                style={{ padding: '8px 16px', fontSize: '13px', background: '#EF4444', color: '#FFF', borderColor: '#EF4444' }}
+              >
+                Delete Resource
+              </button>
             </div>
           </div>
         </div>

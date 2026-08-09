@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { env } from '../config/env.js';
 
 const uploadDir = path.join(process.cwd(), 'public', 'uploads');
@@ -93,6 +94,30 @@ export const StorageService = {
       filename,
       publicUrl
     };
+  },
+
+  async getPresignedDownloadUrl(filename, expiresInSeconds = 3600) {
+    if (!filename) return null;
+    const config = getS3Config();
+
+    if (config.isS3) {
+      if (!s3Client) {
+        s3Client = initS3Client();
+      }
+      try {
+        const command = new GetObjectCommand({
+          Bucket: config.bucket,
+          Key: filename
+        });
+        return await getSignedUrl(s3Client, command, { expiresIn: expiresInSeconds });
+      } catch (err) {
+        console.error('❌ Failed to generate presigned S3 URL:', err);
+        throw new Error(`Failed to generate download URL: ${err.message}`);
+      }
+    }
+
+    // Local Disk Fallback
+    return `http://localhost:${env.PORT || 8080}/uploads/${filename}`;
   },
 
   async deleteFile(filename) {

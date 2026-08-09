@@ -15,6 +15,7 @@ router.post('/', optionalAuth, validate(fileMetadataSchema), FileController.uplo
 router.post('/upload', optionalAuth, upload.single('file'), FileController.uploadBinaryFile);
 router.post('/copy', optionalAuth, validate(fileMetadataSchema), FileController.copyPublicFile);
 router.patch('/:id/visibility', optionalAuth, authorizeOwnership('FileMetadata', 'userId', 'id'), validate(toggleVisibilitySchema), FileController.toggleVisibility);
+router.get('/:id/download', optionalAuth, FileController.getDownloadUrl);
 router.delete('/:id', optionalAuth, authorizeOwnership('FileMetadata', 'userId', 'id'), FileController.deleteFile);
 
 export default router;

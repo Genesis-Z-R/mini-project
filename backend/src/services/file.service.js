@@ -244,6 +244,41 @@ export const FileService = {
     });
   },
 
+  async getDownloadUrl(id, authenticatedUserId = null) {
+    const fileRecord = await prisma.fileMetadata.findUnique({ where: { id } });
+    if (!fileRecord) {
+      throw new Error('File not found');
+    }
+
+    const cleanAuthEmail = authenticatedUserId ? authenticatedUserId.trim().toLowerCase() : '';
+    const isOwner = cleanAuthEmail && fileRecord.userId.toLowerCase() === cleanAuthEmail;
+
+    if (!fileRecord.isPublic && !isOwner) {
+      throw new Error('Access denied. This resource is private.');
+    }
+
+    let filename = '';
+    if (fileRecord.url) {
+      const parts = fileRecord.url.split('/');
+      filename = parts[parts.length - 1];
+    }
+    if (!filename) {
+      filename = fileRecord.id;
+    }
+
+    await prisma.fileMetadata.update({
+      where: { id },
+      data: { downloads: { increment: 1 } }
+    }).catch(() => {});
+
+    const downloadUrl = await StorageService.getPresignedDownloadUrl(filename);
+    return {
+      downloadUrl,
+      filename: fileRecord.title,
+      isPublic: fileRecord.isPublic
+    };
+  },
+
   async deleteFile(id) {
     const fileRecord = await prisma.fileMetadata.findUnique({ where: { id } });
     if (fileRecord && fileRecord.url) {

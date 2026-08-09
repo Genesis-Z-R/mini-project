@@ -465,6 +465,15 @@ export const DatabaseService = {
     }
   },
 
+  async getFileDownloadUrl(id) {
+    try {
+      return await apiFetch(`/files/${encodeURIComponent(id)}/download`);
+    } catch (err) {
+      console.warn("getFileDownloadUrl warning:", err.message);
+      throw err;
+    }
+  },
+
   async toggleFileVisibility(id, isPublic) {
     try {
       const res = await apiFetch(`/files/${encodeURIComponent(id)}/visibility`, {
