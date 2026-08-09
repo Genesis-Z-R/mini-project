@@ -185,16 +185,19 @@ function App() {
     }
   };
 
-  const handleToggleFileVisibility = async (fileId, currentVisibility) => {
+  const handleToggleFileVisibility = async (fileId, newVisibility) => {
     try {
-      const updated = await DatabaseService.toggleFileVisibility(fileId, !currentVisibility);
+      const updated = await DatabaseService.toggleFileVisibility(fileId, newVisibility);
       if (updated && updated.id) {
         setFiles(prev => prev.map(f => f.id === fileId ? updated : f));
+        return updated;
       } else {
-        setFiles(prev => prev.map(f => f.id === fileId ? { ...f, isPublic: !currentVisibility } : f));
+        setFiles(prev => prev.map(f => f.id === fileId ? { ...f, isPublic: newVisibility } : f));
+        return { id: fileId, isPublic: newVisibility };
       }
     } catch (err) {
       console.error("Failed to toggle file visibility:", err);
+      throw err;
     }
   };
 
@@ -486,7 +489,7 @@ function App() {
           aria-label="Dashboard"
         >
           <SquaresFour size={20} weight={activeTab === 'dashboard' ? 'fill' : 'regular'} />
-          <span>Home</span>
+          <span>Dashboard</span>
         </button>
 
         <button 

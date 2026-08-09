@@ -2260,14 +2260,83 @@ html[data-theme='dark'] .dashboard-widget-todays-classes {
     /* Hide image to keep clean vertical flow on mobile */
   }
 
-  /* Timetable and schedulers */
+  /* Timetable and schedulers: Horizontal scrollable day bar on mobile */
   .timetable-days-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    /* Stack week buttons on 2 columns */
+    display: flex !important;
+    grid-template-columns: none !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    padding-bottom: 6px !important;
+    gap: 6px !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .timetable-days-grid::-webkit-scrollbar {
+    display: none;
+  }
+  .timetable-days-grid .pref-day-btn {
+    flex: 0 0 auto !important;
+    min-width: 65px !important;
+    text-align: center !important;
+    padding: 8px 12px !important;
+  }
+
+  /* Scrollable Tab Bars on Mobile */
+  .timetable-toggle-bar,
+  .category-tabs-row,
+  .setting-tabs-nav {
+    display: flex !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .timetable-toggle-bar::-webkit-scrollbar,
+  .category-tabs-row::-webkit-scrollbar,
+  .setting-tabs-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Public Search Cards Responsive Layout */
+  .public-resource-item {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    padding: 16px !important;
+    gap: 14px !important;
+  }
+
+  .public-resource-content {
+    width: 100% !important;
+    display: flex !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .public-resource-actions {
+    width: 100% !important;
+    display: flex !important;
     gap: 8px !important;
+    justify-content: space-between !important;
+  }
+
+  .public-resource-actions .cohort-btn {
+    flex: 1 !important;
+    justify-content: center !important;
   }
 
   /* Dialogs and modal frames */
+  .modal-overlay {
+    padding: 16px !important;
+  }
+  .modal-overlay .cohort-card,
+  .modal-content-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    padding: 20px !important;
+  }
+
   .nm-out {
     padding: 16px !important;
   }
@@ -2357,6 +2426,12 @@ html[data-theme='dark'] .dashboard-widget-todays-classes {
     overflow-wrap: anywhere !important;
   }
 
+  /* Dashboard Stats Grid on Mobile */
+  .dashboard-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 12px !important;
+  }
+
   /* Stack Settings and Toggles full-width */
   .setting-split-layout {
     grid-template-columns: 1fr !important;
@@ -2374,6 +2449,7 @@ html[data-theme='dark'] .dashboard-widget-todays-classes {
 
   .global-search-bar-container {
     flex-direction: column !important;
+    gap: 10px !important;
   }
 }
 

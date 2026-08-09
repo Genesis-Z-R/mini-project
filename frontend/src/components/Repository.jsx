@@ -298,12 +298,29 @@ export function Repository({
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <button 
-                          className="cohort-btn"
-                          onClick={() => onToggleFileVisibility(file.id, !file.isPublic)}
-                          title={file.isPublic ? "Make Private" : "Make Public"}
-                          style={{ padding: '6px 10px', fontSize: '11px' }}
+                          className={`cohort-btn visibility-toggle-btn ${file.isPublic ? 'is-public' : 'is-private'}`}
+                          onClick={async () => {
+                            try {
+                              await onToggleFileVisibility(file.id, !file.isPublic);
+                            } catch (err) {
+                              showNotification("Failed to update resource privacy.", false);
+                            }
+                          }}
+                          title={file.isPublic ? "Click to make Private" : "Click to make Public"}
+                          style={{
+                            padding: '6px 12px',
+                            fontSize: '11.5px',
+                            fontWeight: '700',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            background: file.isPublic ? 'var(--badge-blue-bg, rgba(59, 130, 246, 0.1))' : 'var(--bg-surface)',
+                            color: file.isPublic ? 'var(--brand-blue, #2563EB)' : 'var(--text-secondary)',
+                            border: `1px solid ${file.isPublic ? 'rgba(59, 130, 246, 0.3)' : 'var(--border-color)'}`
+                          }}
                         >
-                          {file.isPublic ? 'Privacy' : 'Share'}
+                          {file.isPublic ? <Globe size={14} weight="bold" /> : <Lock size={14} weight="bold" />}
+                          <span>{file.isPublic ? 'Public' : 'Private'}</span>
                         </button>
                         <button 
                           className="cohort-btn"
@@ -522,37 +539,41 @@ export function Repository({
                 globalSearchResults.map(file => {
                   const isOwnFile = file.userId === userEmail;
                   return (
-                    <div key={file.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', background: 'var(--bg-navigation)', borderRadius: '12px', gap: '16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', flex: 1 }}>
-                        <div style={{ marginTop: '2px' }}>
+                    <div key={file.id} className="public-resource-item">
+                      <div className="public-resource-content">
+                        <div style={{ marginTop: '2px', flexShrink: 0 }}>
                           {getIcon(file.fileType)}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <strong style={{ fontSize: '15px', color: 'var(--text-primary)', fontFamily: 'var(--font-display)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                            <strong style={{ fontSize: '15px', color: 'var(--text-primary)', fontFamily: 'var(--font-display)', wordBreak: 'break-word' }}>
                               {file.title}
                             </strong>
                             {file.relevanceScore > 0 && (
-                              <span style={{ fontSize: '10px', fontWeight: '800', padding: '2px 8px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent)', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <span style={{ fontSize: '10px', fontWeight: '800', padding: '2px 8px', borderRadius: '12px', background: 'rgba(16, 185, 129, 0.15)', color: 'var(--accent)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
                                 <Sparkle size={10} weight="fill" />
                                 Score: {file.relevanceScore}
                               </span>
                             )}
                           </div>
 
-                          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+                          <div className="public-resource-meta" style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
                             <span>Uploaded by: <strong>{file.uploaderName}</strong></span>
                             <span>•</span>
-                            <span style={{ color: 'var(--accent)', fontWeight: '700' }}>🎓 Programme: {file.uploaderProgrammeName}</span>
-                            <span>•</span>
-                            <span>Year: {file.uploaderYear}</span>
+                            <span style={{ color: 'var(--accent)', fontWeight: '700' }}>🎓 {file.uploaderProgrammeName}</span>
+                            {file.uploaderYear && (
+                              <>
+                                <span>•</span>
+                                <span>Year: {file.uploaderYear}</span>
+                              </>
+                            )}
                           </div>
 
-                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', gap: '10px', marginTop: '2px' }}>
+                          <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '2px' }}>
                             <span>{file.fileType.toUpperCase()} • {file.size}</span>
                             <span>•</span>
                             <span>📥 {file.downloads || 0} downloads</span>
-                            {file.uploadDate && <span>• Uploaded: {file.uploadDate}</span>}
+                            {file.uploadDate && <span>• {file.uploadDate}</span>}
                           </div>
 
                           {/* Match Reasons Badges */}
@@ -568,7 +589,7 @@ export function Repository({
                         </div>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                      <div className="public-resource-actions">
                         {!isOwnFile && (
                           <button 
                             className="cohort-btn cohort-btn-primary" 
