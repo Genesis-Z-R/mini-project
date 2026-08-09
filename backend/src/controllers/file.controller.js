@@ -73,7 +73,7 @@ export const FileController = {
         publicUrl: storageResult.publicUrl,
         size: req.file.size,
         sizeStr,
-        filename: req.file.filename
+        filename: storageResult.filename
       });
     } catch (err) {
       return res.status(400).json({ success: false, message: err.message });
