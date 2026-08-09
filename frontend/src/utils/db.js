@@ -26,6 +26,17 @@ const saveLocalProfile = (profile) => {
   all[profile.id || profile.email] = profile;
   localStorage.setItem(PROFILES_LOCAL_KEY, JSON.stringify(all));
 };
+
+const getStoredUserEmail = () => {
+  try {
+    const raw = localStorage.getItem("estudy_user");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return (parsed.email || parsed.uid || "").trim().toLowerCase();
+    }
+  } catch (_) { }
+  return "";
+};
 const apiFetch = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
   const response = await fetch(url, {
@@ -256,34 +267,49 @@ export const DatabaseService = {
     }
   },
 
-  async addCourse(userId, course) {
-    const id = "c_" + Date.now();
-    const newCourse = { ...course, id, userId };
-    try {
-      return await apiFetch("/courses", {
-        method: "POST",
-        body: JSON.stringify(newCourse)
-      });
-    } catch (err) {
-      throw err;
+  async createCourse(courseDataOrUserId, optionalCourseData) {
+    let userId, course;
+    if (typeof courseDataOrUserId === 'string') {
+      userId = courseDataOrUserId;
+      course = optionalCourseData;
+    } else {
+      course = courseDataOrUserId;
+      userId = course?.userId || getStoredUserEmail();
     }
+    const id = course?.id || ("c_" + Date.now());
+    const cleanUserId = (userId || getStoredUserEmail()).toLowerCase();
+    const newCourse = { ...course, id, userId: cleanUserId };
+    return await apiFetch("/courses", {
+      method: "POST",
+      body: JSON.stringify(newCourse)
+    });
   },
 
-  async updateCourse(id, userId, course) {
-    const updatedCourse = { ...course, id, userId };
-    try {
-      return await apiFetch(`/courses/${encodeURIComponent(id)}`, {
-        method: "PUT",
-        body: JSON.stringify(updatedCourse)
-      });
-    } catch (err) {
-      throw err;
-    }
+  async addCourse(userIdOrData, courseData) {
+    return this.createCourse(userIdOrData, courseData);
   },
 
-  async deleteCourse(id) {
+  async updateCourse(id, courseDataOrUserId, optionalUserId) {
+    let updatedCourse, userId;
+    if (typeof courseDataOrUserId === 'object') {
+      updatedCourse = courseDataOrUserId;
+      userId = optionalUserId || updatedCourse?.userId || getStoredUserEmail();
+    } else {
+      userId = courseDataOrUserId;
+      updatedCourse = optionalUserId;
+    }
+    const cleanUserId = (userId || getStoredUserEmail()).toLowerCase();
+    return await apiFetch(`/courses/${encodeURIComponent(id)}?userId=${encodeURIComponent(cleanUserId)}`, {
+      method: "PUT",
+      body: JSON.stringify({ ...updatedCourse, id, userId: cleanUserId })
+    });
+  },
+
+  async deleteCourse(id, userId = "") {
+    const cleanUserId = (userId || getStoredUserEmail()).toLowerCase();
+    const query = cleanUserId ? `?userId=${encodeURIComponent(cleanUserId)}` : "";
     try {
-      await apiFetch(`/courses/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await apiFetch(`/courses/${encodeURIComponent(id)}${query}`, { method: "DELETE" });
     } catch (err) {
       console.warn("Delete course warning:", err.message);
     }
@@ -298,9 +324,26 @@ export const DatabaseService = {
     }
   },
 
-  async addScheduleItem(userId, item) {
-    const id = item.id || ("s_" + Date.now());
-    const newItem = { ...item, id, userId };
+  async createScheduleItem(itemDataOrUserId, optionalItem) {
+    let userId, item;
+    if (typeof itemDataOrUserId === 'string') {
+      userId = itemDataOrUserId;
+      item = optionalItem;
+    } else {
+      item = itemDataOrUserId;
+      userId = item?.userId || getStoredUserEmail();
+    }
+    const id = item?.id || ("s_" + Date.now());
+    const cleanUserId = (userId || getStoredUserEmail()).toLowerCase();
+    const newItem = {
+      ...item,
+      id,
+      userId: cleanUserId,
+      isRepeating: item?.isRepeating ?? true,
+      repeatFrequency: item?.repeatFrequency || "weekly",
+      isClass: item?.isClass ?? true,
+      scheduleType: item?.scheduleType || "CLASS"
+    };
     try {
       const res = await apiFetch("/schedule", {
         method: "POST",
@@ -312,11 +355,24 @@ export const DatabaseService = {
     }
   },
 
-  async updateScheduleItem(id, userId, item) {
+  async addScheduleItem(userIdOrData, itemData) {
+    return this.createScheduleItem(userIdOrData, itemData);
+  },
+
+  async updateScheduleItem(id, itemDataOrUserId, optionalUserId) {
+    let updatedItem, userId;
+    if (typeof itemDataOrUserId === 'object') {
+      updatedItem = itemDataOrUserId;
+      userId = optionalUserId || updatedItem?.userId || getStoredUserEmail();
+    } else {
+      userId = itemDataOrUserId;
+      updatedItem = optionalUserId;
+    }
+    const cleanUserId = (userId || getStoredUserEmail()).toLowerCase();
     try {
       const res = await apiFetch(`/schedule/${encodeURIComponent(id)}`, {
         method: "PUT",
-        body: JSON.stringify({ ...item, userId })
+        body: JSON.stringify({ ...updatedItem, userId: cleanUserId })
       });
       return { success: true, item: res };
     } catch (err) {
@@ -324,12 +380,18 @@ export const DatabaseService = {
     }
   },
 
-  async removeScheduleItem(id) {
+  async deleteScheduleItem(id, userId = "") {
+    const cleanUserId = (userId || getStoredUserEmail()).toLowerCase();
+    const query = cleanUserId ? `?userId=${encodeURIComponent(cleanUserId)}` : "";
     try {
-      await apiFetch(`/schedule/${encodeURIComponent(id)}`, { method: "DELETE" });
+      await apiFetch(`/schedule/${encodeURIComponent(id)}${query}`, { method: "DELETE" });
     } catch (err) {
       console.warn("Remove schedule warning:", err.message);
     }
+  },
+
+  async removeScheduleItem(id, userId = "") {
+    return this.deleteScheduleItem(id, userId);
   },
 
   async getFiles(userId) {
@@ -371,9 +433,16 @@ export const DatabaseService = {
     };
   },
 
-  async uploadFileMetadata(fileData) {
-    const id = "f_" + Date.now();
-    const newFile = { ...fileData, id, downloads: 0, uploadDate: new Date().toISOString().split("T")[0] };
+  async createFile(fileData) {
+    const id = fileData.id || ("f_" + Date.now());
+    const userId = (fileData.userId || getStoredUserEmail()).toLowerCase();
+    const newFile = {
+      ...fileData,
+      id,
+      userId,
+      downloads: fileData.downloads ?? 0,
+      uploadDate: fileData.uploadDate || new Date().toISOString().split("T")[0]
+    };
     try {
       return await apiFetch("/files", {
         method: "POST",
@@ -384,7 +453,11 @@ export const DatabaseService = {
     }
   },
 
-  async deleteFile(id, storageUrl) {
+  async uploadFileMetadata(fileData) {
+    return this.createFile(fileData);
+  },
+
+  async deleteFile(id, userIdOrUrl = "") {
     try {
       await apiFetch(`/files/${encodeURIComponent(id)}`, { method: "DELETE" });
     } catch (err) {
@@ -466,10 +539,13 @@ export const DatabaseService = {
     }
   },
 
-  async addQuiz(quiz) {
-    const id = "q_" + Date.now();
-    const questionsJson = typeof quiz.questions === 'object' ? JSON.stringify(quiz.questions) : (quiz.questionsJson || '[]');
-    const newQuiz = { ...quiz, id, questionsJson };
+  async createQuiz(quizData) {
+    const id = quizData.id || ("q_" + Date.now());
+    const userId = (quizData.userId || getStoredUserEmail()).toLowerCase();
+    const questionsJson = typeof quizData.questions === 'object'
+      ? JSON.stringify(quizData.questions)
+      : (quizData.questionsJson || '[]');
+    const newQuiz = { ...quizData, id, userId, questionsJson };
     try {
       const res = await apiFetch("/quizzes", {
         method: "POST",
@@ -477,14 +553,18 @@ export const DatabaseService = {
       });
       return {
         ...(res || newQuiz),
-        questions: quiz.questions || []
+        questions: quizData.questions || []
       };
     } catch (err) {
       return {
         ...newQuiz,
-        questions: quiz.questions || []
+        questions: quizData.questions || []
       };
     }
+  },
+
+  async addQuiz(quizData) {
+    return this.createQuiz(quizData);
   },
 
   async deleteQuiz(id) {
@@ -516,8 +596,18 @@ export const DatabaseService = {
   },
 
   async saveStudySession(session) {
-    const id = "ss_" + Date.now();
-    const newSession = { ...session, id };
+    const id = session?.id || ("ss_" + Date.now());
+    const userId = (session?.userId || session?.user_id || getStoredUserEmail()).toLowerCase();
+    const durationMinutes = Math.max(1, Math.round(Number(session?.durationMinutes) || 1));
+    const date = session?.date || new Date().toISOString().split("T")[0];
+    const newSession = {
+      id,
+      durationMinutes,
+      date,
+      startTime: session?.startTime || null,
+      endTime: session?.endTime || null,
+      userId
+    };
     try {
       return await apiFetch("/study-sessions", {
         method: "POST",
