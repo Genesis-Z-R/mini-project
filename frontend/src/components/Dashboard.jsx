@@ -73,32 +73,44 @@ export function Dashboard({
     }, 1000);
   };
 
-  const handleStopTimer = () => {
+  const handleStopTimer = async () => {
     setShowStopConfirm(false);
+    
+    // 1. Immediately stop timer interval
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = null;
     }
 
+    // 2. Immediately clear localStorage and reset timer state to 0
     const savedStart = localStorage.getItem('study-timer-start');
     localStorage.removeItem('study-timer-start');
     setTimerActive(false);
+    setElapsedSeconds(0);
 
+    // 3. Save study session to backend
     if (savedStart) {
       const startTimeVal = parseInt(savedStart, 10);
-      const seconds = Math.floor((Date.now() - startTimeVal) / 1000);
+      const seconds = Math.max(0, Math.floor((Date.now() - startTimeVal) / 1000));
       const durationMin = Math.round(seconds / 60) || 1;
 
       const formatTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
-      onSaveStudySession({
-        durationMinutes: durationMin,
-        date: todayString,
-        startTime: formatTime(startTimeVal),
-        endTime: formatTime(Date.now())
-      });
+      try {
+        if (onSaveStudySession) {
+          await onSaveStudySession({
+            durationMinutes: durationMin,
+            date: todayString,
+            startTime: formatTime(startTimeVal),
+            endTime: formatTime(Date.now())
+          });
+        }
+      } catch (err) {
+        console.error("Failed to save study session:", err);
+      }
     }
 
+    // 4. Ensure timer remains reset to 0
     setElapsedSeconds(0);
   };
 

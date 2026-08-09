@@ -439,29 +439,8 @@ export function Setting({ theme, onToggleTheme, profile, onUpdateProfile }) {
 
       {/* Push Notification Explanation Modal */}
       {showPushPermissionModal && (
-        <div 
-          style={{
-            position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.4)',
-            backdropFilter: 'blur(4px)',
-            zIndex: 9999,
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
-          }}
-          onClick={() => setShowPushPermissionModal(false)}
-        >
-          <div 
-            onClick={e => e.stopPropagation()}
-            style={{
-              background: 'var(--bg-surface)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '16px',
-              padding: '32px',
-              maxWidth: '420px',
-              width: '90%',
-              boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
-              textAlign: 'center'
-            }}
-          >
+        <div className="estudy-modal-overlay" onClick={() => setShowPushPermissionModal(false)}>
+          <div className="estudy-modal-container" onClick={e => e.stopPropagation()} style={{ textAlign: 'center' }}>
             <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
               <Broadcast size={24} weight="bold" />
             </div>

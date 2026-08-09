@@ -628,26 +628,27 @@ export function Repository({
 
       {/* DELETE CONFIRMATION MODAL */}
       {fileToDelete && (
-        <div className="modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className="cohort-card nm-out" style={{ background: 'var(--bg-card)', padding: '28px', borderRadius: '16px', maxWidth: '420px', width: '90%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '10px', color: 'var(--text-primary)' }}>
-              Confirm Resource Deletion
-            </h3>
-            <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '24px' }}>
+        <div className="estudy-modal-overlay" onClick={() => setFileToDelete(null)}>
+          <div className="estudy-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="estudy-modal-header">
+              <h3 className="estudy-modal-title">
+                <Warning size={22} style={{ color: '#EF4444' }} weight="bold" />
+                <span>Confirm Resource Deletion</span>
+              </h3>
+            </div>
+            <div className="estudy-modal-body">
               Are you sure you want to delete <strong>"{fileToDelete.title}"</strong>? This will permanently remove the resource from your workspace and storage.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+            </div>
+            <div className="estudy-modal-footer">
               <button 
-                className="cohort-btn" 
+                className="estudy-modal-btn-cancel" 
                 onClick={() => setFileToDelete(null)}
-                style={{ padding: '8px 16px', fontSize: '13px' }}
               >
                 Cancel
               </button>
               <button 
-                className="cohort-btn cohort-btn-primary" 
+                className="estudy-modal-btn-danger" 
                 onClick={confirmDeleteFile}
-                style={{ padding: '8px 16px', fontSize: '13px', background: '#EF4444', color: '#FFF', borderColor: '#EF4444' }}
               >
                 Delete Resource
               </button>

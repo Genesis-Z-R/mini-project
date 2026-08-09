@@ -652,11 +652,14 @@ export function Schedule({
 
       {/* Event Creation / Edit Modal Dialog */}
       {showAddModal && (
-        <div className="quiz-modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="quiz-modal" style={{ maxWidth: '480px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '20px', textAlign: 'center' }}>
-              {editingId ? 'Edit Schedule Item' : 'Add Schedule Item'}
-            </h3>
+        <div className="estudy-modal-overlay" onClick={() => setShowAddModal(false)}>
+          <div className="estudy-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="estudy-modal-header">
+              <h3 className="estudy-modal-title">
+                <Calendar size={22} style={{ color: 'var(--brand-blue)' }} weight="bold" />
+                <span>{editingId ? 'Edit Schedule Item' : 'Add Schedule Item'}</span>
+              </h3>
+            </div>
 
             {error && (
               <div className="alert-box" style={{ marginBottom: '16px' }}>

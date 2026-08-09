@@ -445,11 +445,14 @@ export function Courses({
 
       {/* Add / Edit Course modal dialog */}
       {showModal && (
-        <div className="quiz-modal-overlay" style={{ zIndex: 1100 }}>
-          <div className="quiz-modal" style={{ maxWidth: '440px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '20px', textAlign: 'center' }}>
-              {editingCourse ? 'Edit Course' : 'Add New Course'}
-            </h3>
+        <div className="estudy-modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="estudy-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="estudy-modal-header">
+              <h3 className="estudy-modal-title">
+                <GraduationCap size={22} style={{ color: 'var(--brand-blue)' }} weight="bold" />
+                <span>{editingCourse ? 'Edit Course' : 'Add New Course'}</span>
+              </h3>
+            </div>
 
             {modalError && (
               <div className="alert-box" style={{ marginBottom: '16px' }}>

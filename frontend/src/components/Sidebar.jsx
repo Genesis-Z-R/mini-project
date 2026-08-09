@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SquaresFour, Calendar, User, Gear, UsersThree, GraduationCap, Globe, SignOut } from '@phosphor-icons/react';
+import { SquaresFour, Calendar, User, Gear, UsersThree, GraduationCap, Globe, SignOut, Warning } from '@phosphor-icons/react';
 
 export function Sidebar({ currentTab, setCurrentTab, user, onSignOut, className }) {
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
@@ -54,37 +54,41 @@ export function Sidebar({ currentTab, setCurrentTab, user, onSignOut, className 
           className="cohort-btn cohort-btn-signout"
           style={{ width: '100%', gap: '8px', fontSize: '12px', justifyContent: 'center', background: 'var(--brand-blue)' }}
         >
-          <SignOut size={14} weight="bold" style={{color:'#FFFFFF'}}/>
+          <SignOut size={14} weight="bold" style={{ color: '#FFFFFF' }} />
           <span className="nav-text" style={{ color: '#FFFFFF' }}>Sign Out</span>
         </button>
+
+        {/* Standard Non-Transparent Sign Out Modal */}
         {showSignOutConfirm && (
-          <div
-            onClick={() => setShowSignOutConfirm(false)}
-            style={{
-              position: 'fixed', inset: 0,
-              background: 'rgba(0,0,0,0.35)',
-              backdropFilter: 'blur(6px)',
-              WebkitBackdropFilter: 'blur(6px)',
-              zIndex: 9999,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <div
-              onClick={e => e.stopPropagation()}
-              style={{
-                background: '#ffffff',
-                border: '1px solid #e2e8f0',
-                borderRadius: '14px',
-                padding: '28px 32px',
-                boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
-                textAlign: 'center',
-                minWidth: '240px',
-              }}
-            >
-              <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '16px', color: '#0f172a' }}>Sign out?</div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button type="button" onClick={() => { setShowSignOutConfirm(false); onSignOut(); }} className="cohort-btn confirm-btn-yes" style={{ flex: 1, justifyContent: 'center', padding: '8px', background: '#15803d', color: '#ffffff', fontWeight: '700', border: 'none', borderRadius: '8px' }}>Yes</button>
-                <button type="button" onClick={() => setShowSignOutConfirm(false)} className="cohort-btn confirm-btn-no" style={{ flex: 1, justifyContent: 'center', padding: '8px', background: '#b91c1c', color: '#ffffff', fontWeight: '700', border: 'none', borderRadius: '8px' }}>No</button>
+          <div className="estudy-modal-overlay" onClick={() => setShowSignOutConfirm(false)}>
+            <div className="estudy-modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: '380px' }}>
+              <div className="estudy-modal-header">
+                <h3 className="estudy-modal-title">
+                  <Warning size={22} style={{ color: '#EF4444' }} weight="bold" />
+                  <span>Confirm Sign Out</span>
+                </h3>
+              </div>
+              <div className="estudy-modal-body">
+                Are you sure you want to sign out of your Estudy workspace session?
+              </div>
+              <div className="estudy-modal-footer">
+                <button
+                  type="button"
+                  className="estudy-modal-btn-cancel"
+                  onClick={() => setShowSignOutConfirm(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="estudy-modal-btn-danger"
+                  onClick={() => {
+                    setShowSignOutConfirm(false);
+                    onSignOut();
+                  }}
+                >
+                  Sign Out
+                </button>
               </div>
             </div>
           </div>
@@ -93,4 +97,5 @@ export function Sidebar({ currentTab, setCurrentTab, user, onSignOut, className 
     </aside>
   );
 }
+
 export default Sidebar;

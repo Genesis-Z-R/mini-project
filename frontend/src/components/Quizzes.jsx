@@ -559,11 +559,14 @@ export function Quizzes({ courses, quizzes, quizAttempts, onCreateQuiz, onDelete
 
           {/* Paste AI generated modal */}
           {showAddModal && (
-            <div className="login-bg-overlay" style={{ zIndex: 1100 }}>
-              <div className="login-auth-card nm-out" style={{ maxWidth: '600px', width: '90%' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '800', marginBottom: '12px', textAlign: 'center' }}>
-                  Paste AI Generated Quiz
-                </h3>
+            <div className="estudy-modal-overlay" onClick={() => setShowAddModal(false)}>
+              <div className="estudy-modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px' }}>
+                <div className="estudy-modal-header">
+                  <h3 className="estudy-modal-title">
+                    <ListChecks size={22} style={{ color: 'var(--brand-blue)' }} weight="bold" />
+                    <span>Paste AI Generated Quiz</span>
+                  </h3>
+                </div>
                 <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '16px', lineHeight: '1.4' }}>
                   Copy your AI agent's JSON code block response and paste it directly below. We'll parse the questions, options, and solutions automatically.
                 </p>

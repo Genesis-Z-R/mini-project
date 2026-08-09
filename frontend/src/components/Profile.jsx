@@ -379,31 +379,6 @@ export function Profile({ profile, onUpdateProfile, onBack, onSignOut, theme, on
             </button>
           )}
         </div>
-
-
-
-        {/* Integrated Sign Out Button */}
-        {onSignOut && (
-          <div style={{ width: '100%', marginTop: '24px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
-            <button 
-              className="cohort-btn" 
-              onClick={onSignOut}
-              style={{ 
-                width: '100%', 
-                justifyContent: 'center', 
-                background: 'rgba(239, 68, 68, 0.1)', 
-                color: '#EF4444', 
-                border: '1px solid rgba(239, 68, 68, 0.25)', 
-                fontWeight: '700',
-                padding: '12px 16px',
-                gap: '8px'
-              }}
-            >
-              <SignOut size={18} weight="bold" />
-              <span>Sign Out</span>
-            </button>
-          </div>
-        )}
       </div>
     </motion.div>
   );

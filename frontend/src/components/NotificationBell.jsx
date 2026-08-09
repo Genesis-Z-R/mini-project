@@ -102,6 +102,7 @@ export function NotificationBell({
       {/* Notifications Popover Dropdown */}
       {isOpen && (
         <div
+          className="notification-dropdown-menu"
           style={{
             position: 'absolute',
             right: 0,
