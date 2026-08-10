@@ -292,33 +292,32 @@ export function Dashboard({
                           <span>Stop Session</span>
                         </button>
                         {showStopConfirm && (
-                          <div
-                            onClick={() => setShowStopConfirm(false)}
-                            style={{
-                              position: 'fixed', inset: 0,
-                              background: 'rgba(0,0,0,0.65)',
-                              backdropFilter: 'blur(6px)',
-                              WebkitBackdropFilter: 'blur(6px)',
-                              zIndex: 9999,
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            }}
-                          >
-                            <div
-                              onClick={e => e.stopPropagation()}
-                              style={{
-                                background: 'var(--bg-surface)',
-                                border: '1px solid var(--border-color)',
-                                borderRadius: '14px',
-                                padding: '28px 32px',
-                                boxShadow: '0 24px 64px rgba(0,0,0,0.5)',
-                                textAlign: 'center',
-                                minWidth: '240px',
-                              }}
-                            >
-                              <div style={{ fontSize: '14px', fontWeight: '700', marginBottom: '16px', color: 'var(--text-primary)' }}>End session?</div>
-                              <div style={{ display: 'flex', gap: '10px' }}>
-                                <button onClick={handleStopTimer} className="cohort-btn confirm-btn-yes" style={{ flex: 1, justifyContent: 'center', padding: '8px', background: '#15803d', color: '#ffffff', fontWeight: '700', border: 'none', borderRadius: '8px' }}>Yes</button>
-                                <button onClick={() => setShowStopConfirm(false)} className="cohort-btn confirm-btn-no" style={{ flex: 1, justifyContent: 'center', padding: '8px', background: '#b91c1c', color: '#ffffff', fontWeight: '700', border: 'none', borderRadius: '8px' }}>No</button>
+                          <div className="estudy-modal-overlay" onClick={() => setShowStopConfirm(false)}>
+                            <div className="estudy-modal-container" onClick={e => e.stopPropagation()} style={{ maxWidth: '380px', textAlign: 'center' }}>
+                              <div className="estudy-modal-header">
+                                <h3 className="estudy-modal-title" style={{ justifyContent: 'center' }}>
+                                  <Square size={20} style={{ color: '#EF4444' }} weight="fill" />
+                                  <span>End Study Session?</span>
+                                </h3>
+                              </div>
+                              <div className="estudy-modal-body">
+                                Are you sure you want to stop and log your active study session time?
+                              </div>
+                              <div className="estudy-modal-footer" style={{ justifyContent: 'center' }}>
+                                <button
+                                  type="button"
+                                  className="estudy-modal-btn-cancel"
+                                  onClick={() => setShowStopConfirm(false)}
+                                >
+                                  Continue
+                                </button>
+                                <button
+                                  type="button"
+                                  className="estudy-modal-btn-danger"
+                                  onClick={handleStopTimer}
+                                >
+                                  Stop & Save
+                                </button>
                               </div>
                             </div>
                           </div>

@@ -35,6 +35,7 @@ export function Sidebar({ currentTab, setCurrentTab, user, onSignOut, className 
               key={item.id}
               onClick={() => setCurrentTab(item.id)}
               className={`estudy-nav-item ${currentTab === item.id ? 'active' : ''}`}
+              title={item.label}
               style={{ border: 'none', background: 'transparent', textAlign: 'left', width: '100%' }}
             >
               <Icon size={18} weight={currentTab === item.id ? 'fill' : 'regular'} />

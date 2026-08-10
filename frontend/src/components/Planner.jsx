@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Gear, Sparkle, Trash, Calendar, Plus } from '@phosphor-icons/react';
+import { Gear, Sparkle, Trash, Calendar, Plus, Warning } from '@phosphor-icons/react';
 
 export function Planner({ 
   courses, 
@@ -21,6 +21,7 @@ export function Planner({
   const [selectedDays, setSelectedDays] = useState(['Monday', 'Wednesday', 'Friday']);
   const [targetHours, setTargetHours] = useState(8);
   const [successMsg, setSuccessMsg] = useState('');
+  const [showClearPlanConfirm, setShowClearPlanConfirm] = useState(false);
 
   // Manual study block states
   const [showManualForm, setShowManualForm] = useState(false);
@@ -155,7 +156,7 @@ export function Planner({
                   Generate Plan
                 </button>
                 {studyBlocks.length > 0 && (
-                  <button className="cohort-btn" onClick={onClearPlan} style={{ justifyContent: 'center', color: '#EF4444' }} title="Clear study plan">
+                  <button className="cohort-btn" onClick={() => setShowClearPlanConfirm(true)} style={{ justifyContent: 'center', color: '#EF4444' }} title="Clear study plan">
                     <Trash size={16} />
                   </button>
                 )}
@@ -278,9 +279,42 @@ export function Planner({
                 No study blocks generated yet. Set your preferences and click <strong>Generate Plan</strong> to construct an optimized schedule.
               </p>
             </div>
-          )}
         </div>
       </div>
+
+      {/* Clear Study Plan Confirmation Modal */}
+      {showClearPlanConfirm && (
+        <div className="estudy-modal-overlay" onClick={() => setShowClearPlanConfirm(false)}>
+          <div className="estudy-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="estudy-modal-header">
+              <h3 className="estudy-modal-title">
+                <Warning size={22} style={{ color: '#EF4444' }} weight="bold" />
+                <span>Confirm Clear Study Plan</span>
+              </h3>
+            </div>
+            <div className="estudy-modal-body">
+              Are you sure you want to clear your current generated study plan? All study block allocations will be reset.
+            </div>
+            <div className="estudy-modal-footer">
+              <button 
+                className="estudy-modal-btn-cancel" 
+                onClick={() => setShowClearPlanConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="estudy-modal-btn-danger" 
+                onClick={() => {
+                  onClearPlan();
+                  setShowClearPlanConfirm(false);
+                }}
+              >
+                Clear Plan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }

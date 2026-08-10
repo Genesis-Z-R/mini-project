@@ -15,6 +15,7 @@ export function Peers({ friendships = [], setFriendships, userEmail, onNavigate 
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loadingPeers, setLoadingPeers] = useState(false);
+  const [peerToUnfollow, setPeerToUnfollow] = useState(null);
 
   // Fetch recommended peers and profiles once or when userEmail changes
   const fetchRecommendedPeers = async () => {
@@ -276,8 +277,8 @@ export function Peers({ friendships = [], setFriendships, userEmail, onNavigate 
             <button
               className="cohort-btn"
               onClick={() => {
-                if (selectedFriend.friendshipId && confirm(`Unfollow ${selectedFriend.name}?`)) {
-                  handleRemoveFollow(selectedFriend.friendshipId, selectedFriend.email);
+                if (selectedFriend.friendshipId) {
+                  setPeerToUnfollow(selectedFriend);
                 }
               }}
               style={{ color: '#EF4444' }}
@@ -528,6 +529,40 @@ export function Peers({ friendships = [], setFriendships, userEmail, onNavigate 
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Unfollow Peer Confirmation Modal */}
+      {peerToUnfollow && (
+        <div className="estudy-modal-overlay" onClick={() => setPeerToUnfollow(null)}>
+          <div className="estudy-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="estudy-modal-header">
+              <h3 className="estudy-modal-title">
+                <Warning size={22} style={{ color: '#EF4444' }} weight="bold" />
+                <span>Confirm Unfollow</span>
+              </h3>
+            </div>
+            <div className="estudy-modal-body">
+              Are you sure you want to unfollow <strong>"{peerToUnfollow.name}"</strong>? You will no longer see their shared resources in your stream.
+            </div>
+            <div className="estudy-modal-footer">
+              <button 
+                className="estudy-modal-btn-cancel" 
+                onClick={() => setPeerToUnfollow(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="estudy-modal-btn-danger" 
+                onClick={() => {
+                  handleRemoveFollow(peerToUnfollow.friendshipId, peerToUnfollow.email);
+                  setPeerToUnfollow(null);
+                }}
+              >
+                Unfollow Peer
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </motion.div>

@@ -10,6 +10,7 @@ export function Quizzes({ courses, quizzes, quizAttempts, onCreateQuiz, onDelete
   const [pastedJson, setPastedJson] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [quizToDelete, setQuizToDelete] = useState(null);
 
   // Active Test Run State
   const [currentQuestions, setCurrentQuestions] = useState([]); // Shuffled list
@@ -537,11 +538,7 @@ export function Quizzes({ courses, quizzes, quizAttempts, onCreateQuiz, onDelete
                       </button>
                       <button 
                         className="icon-action-btn danger" 
-                        onClick={() => {
-                          if (confirm(`Delete quiz "${quiz.title}" and erase its attempt history?`)) {
-                            onDeleteQuiz(quiz.id);
-                          }
-                        }}
+                        onClick={() => setQuizToDelete(quiz)}
                         title="Delete quiz"
                       >
                         <Trash size={16} style={{ color: 'var(--text-tertiary)' }} />
@@ -582,23 +579,56 @@ export function Quizzes({ courses, quizzes, quizAttempts, onCreateQuiz, onDelete
                     required
                   />
 
-                  <div style={{ display: 'flex', gap: '12px', marginTop: '20px' }}>
-                    <button type="submit" className="cohort-btn cohort-btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
-                      Parse and Add Quiz
-                    </button>
+                  <div className="estudy-modal-footer">
                     <button 
                       type="button" 
-                      className="cohort-btn" 
+                      className="estudy-modal-btn-cancel" 
                       onClick={() => setShowAddModal(false)}
-                      style={{ flex: 1, justifyContent: 'center' }}
                     >
                       Cancel
+                    </button>
+                    <button type="submit" className="estudy-modal-btn-primary">
+                      Parse and Add Quiz
                     </button>
                   </div>
                 </form>
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Delete Quiz Confirmation Modal */}
+      {quizToDelete && (
+        <div className="estudy-modal-overlay" onClick={() => setQuizToDelete(null)}>
+          <div className="estudy-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="estudy-modal-header">
+              <h3 className="estudy-modal-title">
+                <Warning size={22} style={{ color: '#EF4444' }} weight="bold" />
+                <span>Confirm Quiz Deletion</span>
+              </h3>
+            </div>
+            <div className="estudy-modal-body">
+              Are you sure you want to delete <strong>"{quizToDelete.title}"</strong>? All attempt history and scoring logs for this quiz will be erased.
+            </div>
+            <div className="estudy-modal-footer">
+              <button 
+                className="estudy-modal-btn-cancel" 
+                onClick={() => setQuizToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="estudy-modal-btn-danger" 
+                onClick={() => {
+                  onDeleteQuiz(quizToDelete.id);
+                  setQuizToDelete(null);
+                }}
+              >
+                Delete Quiz
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </motion.div>

@@ -356,7 +356,7 @@ export function Profile({ profile, onUpdateProfile, onBack, onSignOut, theme, on
 
         <div className="profile-buttons-stack" style={{ width: '100%', marginTop: '24px' }}>
           {isEditing ? (
-            <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+            <div className="profile-edit-buttons" style={{ display: 'flex', gap: '12px', width: '100%' }}>
               <button 
                 className="cohort-btn cohort-btn-primary" 
                 onClick={handleSave} 

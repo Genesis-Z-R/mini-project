@@ -1760,6 +1760,7 @@ html[data-theme='dark'] .profile-table-row {
   cursor: pointer;
   transition: all var(--duration-fast) ease;
   text-decoration: none;
+  position: relative;
 }
 
 .estudy-nav-item:hover {
@@ -1768,8 +1769,20 @@ html[data-theme='dark'] .profile-table-row {
 }
 
 .estudy-nav-item.active {
-  background: rgba(84, 102, 255, 0.08);
+  background: rgba(84, 102, 255, 0.1);
   color: var(--brand-blue);
+  font-weight: 700;
+}
+
+.estudy-nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 4px;
+  background: var(--brand-blue);
+  border-radius: 0 4px 4px 0;
 }
 
 .estudy-nav-item.active:hover {
@@ -2372,6 +2385,16 @@ html[data-theme='dark'] .dashboard-widget-todays-classes {
     padding: 24px 16px !important;
   }
 
+  .profile-edit-buttons {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+
+  .profile-edit-buttons .cohort-btn {
+    width: 100% !important;
+    padding: 12px !important;
+  }
+
   .profile-details-table {
     padding: 0 !important;
     border-radius: 16px !important;
@@ -2683,6 +2706,9 @@ html[data-theme='dark'] .notification-dropdown-menu {
 /* ============================================================
    ESTUDY STANDARD NON-TRANSPARENT MODAL & DIALOG SYSTEM
    ============================================================ */
+/* ============================================================
+   ESTUDY UNIFIED HIGH-END MODAL & DIALOG SYSTEM
+   ============================================================ */
 .estudy-modal-overlay {
   position: fixed !important;
   inset: 0 !important;
@@ -2694,13 +2720,24 @@ html[data-theme='dark'] .notification-dropdown-menu {
   justify-content: center !important;
   z-index: 9999 !important;
   padding: 16px !important;
+  animation: estudyFadeIn 0.2s ease-out;
+}
+
+@keyframes estudyFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes estudyModalPop {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .estudy-modal-container {
-  background-color: var(--bg-surface-solid, #FFFFFF) !important;
-  border: 1px solid var(--border-color, #E2E8F0) !important;
+  background-color: var(--bg-surface, #FFFFFF) !important;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1)) !important;
   border-radius: 20px !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4) !important;
+  box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.35) !important;
   width: 100% !important;
   max-width: 480px !important;
   max-height: 85vh !important;
@@ -2709,20 +2746,22 @@ html[data-theme='dark'] .notification-dropdown-menu {
   position: relative !important;
   color: var(--text-primary) !important;
   opacity: 1 !important;
+  animation: estudyModalPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 html[data-theme='dark'] .estudy-modal-container {
   background-color: #1E293B !important;
-  border-color: #334155 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.7) !important;
 }
 
 html[data-theme='light'] .estudy-modal-container {
   background-color: #FFFFFF !important;
-  border-color: #E2E8F0 !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
 }
 
 .estudy-modal-header {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .estudy-modal-title {
@@ -2739,7 +2778,7 @@ html[data-theme='light'] .estudy-modal-container {
 .estudy-modal-body {
   font-size: 14px;
   color: var(--text-secondary);
-  line-height: 1.55;
+  line-height: 1.6;
   margin-bottom: 24px;
 }
 
@@ -2748,54 +2787,73 @@ html[data-theme='light'] .estudy-modal-container {
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
+  margin-top: 24px;
+}
+
+.estudy-modal-btn-cancel,
+.estudy-modal-btn-danger,
+.estudy-modal-btn-primary {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  padding: 10px 20px !important;
+  border-radius: 12px !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  min-height: 42px !important;
 }
 
 .estudy-modal-btn-cancel {
-  background: var(--bg-navigation);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
-  padding: 10px 18px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  background: var(--bg-navigation) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-color) !important;
 }
 
 .estudy-modal-btn-cancel:hover {
-  background: var(--border-color);
+  background: var(--border-color) !important;
 }
 
 .estudy-modal-btn-danger {
   background: #EF4444 !important;
   color: #FFFFFF !important;
   border: 1px solid #DC2626 !important;
-  padding: 10px 18px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35) !important;
 }
 
 .estudy-modal-btn-danger:hover {
   background: #DC2626 !important;
+  transform: translateY(-1px);
 }
 
 .estudy-modal-btn-primary {
   background: var(--brand-blue, #2563EB) !important;
   color: #FFFFFF !important;
   border: 1px solid var(--brand-blue, #2563EB) !important;
-  padding: 10px 18px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35) !important;
 }
 
 .estudy-modal-btn-primary:hover {
   background: #1D4ED8 !important;
+  transform: translateY(-1px);
+}
+
+/* Mobile Responsiveness for Modals */
+@media (max-width: 640px) {
+  .estudy-modal-container {
+    padding: 22px 18px !important;
+    max-width: 95vw !important;
+    border-radius: 16px !important;
+  }
+  .estudy-modal-footer {
+    flex-direction: column-reverse !important;
+    gap: 10px !important;
+  }
+  .estudy-modal-btn-cancel,
+  .estudy-modal-btn-danger,
+  .estudy-modal-btn-primary {
+    width: 100% !important;
+  }
 }

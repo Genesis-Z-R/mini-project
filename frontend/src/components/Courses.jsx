@@ -40,6 +40,7 @@ export function Courses({
   const [editingCourse, setEditingCourse] = useState(null);
   const [modalError, setModalError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [courseToDelete, setCourseToDelete] = useState(null);
 
   // Form states
   const [code, setCode] = useState('');
@@ -422,9 +423,7 @@ export function Courses({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm(`Are you sure you want to delete ${course.code}? All nested files and quizzes will lose association.`)) {
-                        onDeleteCourse(course.id);
-                      }
+                      setCourseToDelete(course);
                     }}
                     className="cohort-btn"
                     style={{ padding: '6px', border: 'none', background: 'transparent', boxShadow: 'none' }}
@@ -497,25 +496,57 @@ export function Courses({
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                <button 
-                  type="submit" 
-                  className="cohort-btn cohort-btn-primary" 
-                  disabled={submitting}
-                  style={{ flex: 1, justifyContent: 'center' }}
-                >
-                  {submitting ? 'Saving...' : editingCourse ? 'Update Course' : 'Create Subject'}
-                </button>
+              <div className="estudy-modal-footer">
                 <button 
                   type="button" 
-                  className="cohort-btn" 
+                  className="estudy-modal-btn-cancel" 
                   onClick={() => setShowModal(false)}
-                  style={{ flex: 1, justifyContent: 'center' }}
                 >
                   Cancel
                 </button>
+                <button 
+                  type="submit" 
+                  className="estudy-modal-btn-primary" 
+                  disabled={submitting}
+                >
+                  {submitting ? 'Saving...' : editingCourse ? 'Update Course' : 'Create Subject'}
+                </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Course Confirmation Modal */}
+      {courseToDelete && (
+        <div className="estudy-modal-overlay" onClick={() => setCourseToDelete(null)}>
+          <div className="estudy-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="estudy-modal-header">
+              <h3 className="estudy-modal-title">
+                <Warning size={22} style={{ color: '#EF4444' }} weight="bold" />
+                <span>Confirm Course Deletion</span>
+              </h3>
+            </div>
+            <div className="estudy-modal-body">
+              Are you sure you want to delete <strong>"{courseToDelete.code} - {courseToDelete.name}"</strong>? All associated schedule items and file references will lose association.
+            </div>
+            <div className="estudy-modal-footer">
+              <button 
+                className="estudy-modal-btn-cancel" 
+                onClick={() => setCourseToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="estudy-modal-btn-danger" 
+                onClick={() => {
+                  onDeleteCourse(courseToDelete.id);
+                  setCourseToDelete(null);
+                }}
+              >
+                Delete Course
+              </button>
+            </div>
           </div>
         </div>
       )}

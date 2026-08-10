@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   FilePdf, FileImage, Video, FileDoc, BookOpen, Plus, Trash, Globe, Lock, Download, 
-  MagnifyingGlass, CheckCircle, Warning, Spinner, GraduationCap, Sparkle, Funnel, Clock
+  MagnifyingGlass, CheckCircle, Warning, Spinner, GraduationCap, Sparkle, Funnel, Clock, XCircle
 } from '@phosphor-icons/react';
 import { DatabaseService } from '../utils/db';
 
@@ -192,6 +192,19 @@ export function Repository({
     }
   };
 
+  const formatFileSize = (sizeStr) => {
+    if (!sizeStr) return '0 KB';
+    if (typeof sizeStr === 'string' && (sizeStr.includes('KB') || sizeStr.includes('MB') || sizeStr.includes('GB'))) {
+      return sizeStr;
+    }
+    const bytes = typeof sizeStr === 'number' ? sizeStr : parseInt(sizeStr, 10);
+    if (isNaN(bytes) || bytes === 0) return '0 KB';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
   const filteredMyFiles = files.filter(f => {
     if (activeCategory === 'all') return true;
     return f.fileType === activeCategory;
@@ -286,7 +299,7 @@ export function Repository({
                             {file.title}
                           </strong>
                           <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '11.5px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                            <span>{file.size}</span>
+                            <span>{formatFileSize(file.size)}</span>
                             <span>•</span>
                             <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: file.isPublic ? 'var(--accent)' : 'var(--text-tertiary)' }}>
                               {file.isPublic ? <Globe size={12} /> : <Lock size={12} />}
@@ -462,14 +475,36 @@ export function Repository({
           <div className="cohort-card nm-out" style={{ padding: '24px' }}>
             {/* Search Input Bar */}
             <form onSubmit={handleGlobalSearchSubmit} className="global-search-bar-container" style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-              <input 
-                type="text" 
-                className="cohort-input" 
-                placeholder="Search resources by title or course code (e.g., Database Notes, CSM 352)..." 
-                value={globalSearchQuery}
-                onChange={e => setGlobalSearchQuery(e.target.value)}
-                style={{ flex: 1 }}
-              />
+              <div style={{ position: 'relative', flex: 1, display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type="text" 
+                  className="cohort-input" 
+                  placeholder="Search resources by title or course code (e.g., Database Notes, CSM 352)..." 
+                  value={globalSearchQuery}
+                  onChange={e => setGlobalSearchQuery(e.target.value)}
+                  style={{ width: '100%', paddingRight: globalSearchQuery ? '36px' : '14px' }}
+                />
+                {globalSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => { setGlobalSearchQuery(''); }}
+                    style={{
+                      position: 'absolute',
+                      right: '10px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-tertiary)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: 0
+                    }}
+                    title="Clear search"
+                  >
+                    <XCircle size={18} weight="fill" />
+                  </button>
+                )}
+              </div>
               <button type="submit" className="cohort-btn cohort-btn-primary" style={{ gap: '8px', padding: '10px 20px' }}>
                 <MagnifyingGlass size={16} weight="bold" />
                 <span>Search</span>
@@ -570,7 +605,7 @@ export function Repository({
                           </div>
 
                           <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '2px' }}>
-                            <span>{file.fileType.toUpperCase()} • {file.size}</span>
+                            <span>{file.fileType.toUpperCase()} • {formatFileSize(file.size)}</span>
                             <span>•</span>
                             <span>📥 {file.downloads || 0} downloads</span>
                             {file.uploadDate && <span>• {file.uploadDate}</span>}

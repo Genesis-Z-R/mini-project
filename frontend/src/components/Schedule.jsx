@@ -19,6 +19,7 @@ export function Schedule({
   // Modal / Form state
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [itemToDelete, setItemToDelete] = useState(null);
   
   // Event Form Fields
   const [name, setName] = useState('');
@@ -488,11 +489,7 @@ export function Schedule({
                         </button>
                         <button 
                           className="icon-action-btn danger"
-                          onClick={() => {
-                            if (confirm(`Remove class "${item.name}"?`)) {
-                              onRemoveScheduleItem(item.id);
-                            }
-                          }}
+                          onClick={() => setItemToDelete(item)}
                           title="Delete class"
                         >
                           <Trash size={16} style={{ color: 'var(--text-tertiary)' }} />
@@ -572,11 +569,7 @@ export function Schedule({
                         </button>
                         <button 
                           className="icon-action-btn danger"
-                          onClick={() => {
-                            if (confirm(`Remove event "${item.name}"?`)) {
-                              onRemoveScheduleItem(item.id);
-                            }
-                          }}
+                          onClick={() => setItemToDelete(item)}
                           title="Delete event"
                         >
                           <Trash size={16} style={{ color: 'var(--text-tertiary)' }} />
@@ -798,20 +791,53 @@ export function Schedule({
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
-                <button type="submit" className="cohort-btn cohort-btn-primary" style={{ flex: 1, justifyContent: 'center' }}>
-                  {editingId ? 'Update Event' : 'Save to Schedule'}
-                </button>
+              <div className="estudy-modal-footer">
                 <button 
                   type="button" 
-                  className="cohort-btn" 
+                  className="estudy-modal-btn-cancel" 
                   onClick={() => setShowAddModal(false)}
-                  style={{ flex: 1, justifyContent: 'center' }}
                 >
                   Cancel
                 </button>
+                <button type="submit" className="estudy-modal-btn-primary">
+                  {editingId ? 'Update Event' : 'Save to Schedule'}
+                </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Schedule Item Confirmation Modal */}
+      {itemToDelete && (
+        <div className="estudy-modal-overlay" onClick={() => setItemToDelete(null)}>
+          <div className="estudy-modal-container" onClick={e => e.stopPropagation()}>
+            <div className="estudy-modal-header">
+              <h3 className="estudy-modal-title">
+                <Warning size={22} style={{ color: '#EF4444' }} weight="bold" />
+                <span>Confirm Item Deletion</span>
+              </h3>
+            </div>
+            <div className="estudy-modal-body">
+              Are you sure you want to remove <strong>"{itemToDelete.name}"</strong> from your schedule?
+            </div>
+            <div className="estudy-modal-footer">
+              <button 
+                className="estudy-modal-btn-cancel" 
+                onClick={() => setItemToDelete(null)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="estudy-modal-btn-danger" 
+                onClick={() => {
+                  onRemoveScheduleItem(itemToDelete.id);
+                  setItemToDelete(null);
+                }}
+              >
+                Delete Item
+              </button>
+            </div>
           </div>
         </div>
       )}
